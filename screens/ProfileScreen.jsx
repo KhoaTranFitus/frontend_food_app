@@ -1,4 +1,4 @@
-import React, { useContext} from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -6,30 +6,110 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Modal, // Thêm Modal
+  TextInput, // Thêm TextInput
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { AuthContext } from "../context/AuthContext";
+import { useNavigation } from "@react-navigation/native"; // Thêm useNavigation
+
+// -------------------------------------------------------------------
+// ✅ API SERVICE GIẢ LẬP (Tạm thời)
+// Đây là nơi bạn sẽ thay thế bằng logic gọi API Backend thực tế
+const apiService = {
+  fetchUserProfile: async () => {
+    // API GET /api/users/profile
+    // Giả lập dữ liệu trả về từ Backend
+    return {
+      name: "Bung bu", 
+      email: "bitch24c02@gmail.com",
+      avatarUrl: "https://i.pinimg.com/564x/0c/7c/42/0c7c42856e59f7db5e9d08b5f83b09eb.jpg",
+      // Giả sử có thêm số điện thoại, địa chỉ...
+    };
+  },
+  changePassword: async (oldPassword, newPassword) => {
+    // API PUT/PATCH /api/users/profile (hoặc /api/users/password)
+    console.log("Calling Backend to change password...");
+    // Giả lập độ trễ API
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
+    return { success: true };
+  },
+};
+// -------------------------------------------------------------------
+
 
 export default function ProfileScreen() {
+  const navigation = useNavigation();
+  const { logout } = useContext(AuthContext); 
 
-  const { logout } = useContext(AuthContext); // dùng logout từ context
+  // 📦 STATE DỮ LIỆU
+  const [profile, setProfile] = useState({
+    name: 'Loading...',
+    email: 'loading@app.com',
+    avatarUrl: 'https://via.placeholder.com/120',
+  });
+  const [showSettingsModal, setShowSettingsModal] = useState(false); // Quản lý popup1
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
+  // 🔄 HIỆU ỨNG: TẢI DỮ LIỆU PROFILE
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const data = await apiService.fetchUserProfile();
+        setProfile(data); // Cập nhật State với dữ liệu từ API giả lập
+      } catch (error) {
+        console.error("Failed to fetch profile:", error);
+      }
+    };
+    loadProfile();
+  }, []);
+
+  // 🔒 HÀM: LOGOUT
   const handleLogout = async () => {
     try {
-      await logout(); // gọi hàm logout() trong context
+      await logout();
+      // Thêm điều hướng về màn hình đăng nhập nếu cần
+      // navigation.navigate('Login'); 
     } catch (error) {
       console.log("Logout error:", error);
     }
   };
+  
+  // ⚙️ HÀM: CHANGE PASSWORD (Xử lý popup1)
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword) {
+      alert("Vui lòng điền đầy đủ mật khẩu cũ và mật khẩu mới.");
+      return;
+    }
+    
+    try {
+        const result = await apiService.changePassword(oldPassword, newPassword);
+        if (result.success) {
+            alert("Mật khẩu đã được thay đổi thành công!");
+            setShowSettingsModal(false); // Đóng popup
+            setOldPassword('');
+            setNewPassword('');
+        }
+    } catch (error) {
+        alert("Thay đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu cũ.");
+    }
+  };
+
 
   return (
     <SafeAreaView style={styles.container}> 
-      {/* 🧑 Header */}
+      {/* 🧑 HEADER MỚI (Thêm nút Quay lại và Settings) */}
       <View style={styles.header}>
-        <Text style={styles.title}>My Profile</Text>
-        <TouchableOpacity>
-          <Feather name="edit-3" size={22} color="#000" />
+        {/* Nút Quay lại (Yêu cầu của bạn) */}
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+            <Ionicons name="arrow-back-outline" size={24} color="#000" />
+        </TouchableOpacity>
+        
+        {/* Nút Settings (Bánh răng) */}
+        <TouchableOpacity onPress={() => setShowSettingsModal(true)} style={styles.headerButton}>
+          <Ionicons name="settings-outline" size={24} color="#000" />
         </TouchableOpacity>
       </View>
 
@@ -37,77 +117,158 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* 🖼️ Avatar */}
+        {/* 🖼️ AVATAR & INFO (Sử dụng dữ liệu State) */}
         <View style={styles.avatarSection}>
           <Image
-            source={{
-              uri: "https://i.pinimg.com/564x/0c/7c/42/0c7c42856e59f7db5e9d08b5f83b09eb.jpg",
-            }}
+            source={{ uri: profile.avatarUrl }}
             style={styles.avatar}
           />
-          <Text style={styles.name}>Lio Doan</Text>
-          <Text style={styles.email}>lio.Doan@sport.com</Text>
+          <Text style={styles.name}>{profile.name}</Text>
+          <Text style={styles.email}>{profile.email}</Text>
+          
+          {/* Nút Edit Profile (Giữ nguyên vị trí) */}
+          <TouchableOpacity style={styles.editButton}>
+            <Ionicons name="pencil-outline" size={16} color="#000" />
+            <Text style={styles.editButtonText}>Edit profile</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* 📦 Options */}
-        <View style={styles.optionBox}>
-          <TouchableOpacity style={styles.optionRow}>
-            <Ionicons name="person-outline" size={22} color="#000" />
-            <Text style={styles.optionText}>Edit Profile</Text>
-          </TouchableOpacity>
+        {/* TIÊU ĐỀ "More options" */}
+        <Text style={styles.moreOptionsTitle}>More options</Text>
 
+        {/* 📦 OPTION BOX */}
+        <View style={styles.optionBox}>
+          {/* Saved Dishes */}
           <TouchableOpacity style={styles.optionRow}>
             <Feather name="bookmark" size={22} color="#000" />
             <Text style={styles.optionText}>Saved Dishes</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.optionRow}>
-            <Ionicons name="settings-outline" size={22} color="#000" />
-            <Text style={styles.optionText}>Settings</Text>
-          </TouchableOpacity>
-
+          {/* Help & Support */}
           <TouchableOpacity style={styles.optionRow}>
             <Ionicons name="help-circle-outline" size={22} color="#000" />
             <Text style={styles.optionText}>Help & Support</Text>
           </TouchableOpacity>
 
-          {/* ✅ Nút Log Out */}
-          <TouchableOpacity style={styles.optionRow} onPress={handleLogout}>
+          {/* Log Out */}
+          <TouchableOpacity style={[styles.optionRow, styles.lastOption]} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={22} color="red" />
             <Text style={[styles.optionText, { color: "red" }]}>Log Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* ⚙️ MODAL SETTINGS (popup1) */}
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={showSettingsModal}
+      onRequestClose={() => setShowSettingsModal(false)}
+    >
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.container}>
+          <View style={modalStyles.header}>
+            <Text style={modalStyles.title}>Settings</Text>
+            <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
+              <Ionicons name="close-circle-outline" size={28} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Danh sách các mục trong Settings */}
+          <View style={modalStyles.settingsList}>
+            <TouchableOpacity style={modalStyles.settingItem}>
+              <View style={modalStyles.settingLeft}>
+                <Ionicons name="lock-closed-outline" size={22} color="#000" />
+                <Text style={modalStyles.settingText}>Change Password</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={modalStyles.settingItem}>
+              <View style={modalStyles.settingLeft}>
+                <Ionicons name="shield-checkmark-outline" size={22} color="#000" />
+                <Text style={modalStyles.settingText}>Privacy & Security</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={modalStyles.settingItem}>
+              <View style={modalStyles.settingLeft}>
+                <Ionicons name="notifications-outline" size={22} color="#000" />
+                <Text style={modalStyles.settingText}>Notifications</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={20} color="#000" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[modalStyles.settingItem, modalStyles.lastItem]}>
+              <View style={modalStyles.settingLeft}>
+                <Ionicons name="information-circle-outline" size={22} color="#000" />
+                <Text style={modalStyles.settingText}>About App</Text>
+              </View>
+              <Ionicons name="chevron-forward-outline" size={20} color="#000" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
     </SafeAreaView>
   );
 }
 
+
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
-    backgroundColor: "#E3A721",
-    paddingHorizontal: 20,
+    backgroundColor: "#F7BE27",
+    
   },
+  
+
+  topBackground: {
+    height: '30%', 
+    backgroundColor: '#815D0D',
+    position: 'absolute', 
+    width: '100%',
+    top: 0,
+    left: 0,
+  },
+  
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginTop: 10,
-    marginBottom: 20,
+    marginBottom: 20, 
+    paddingHorizontal: 20, 
+    position: 'relative', 
+    zIndex: 10, 
   },
-  title: {
-    fontWeight: "bold",
-    fontSize: 22,
-    color: "#000",
+  headerButton: {
+    padding: 5,
   },
+
+  scrollViewContent: {
+    flexGrow: 1, 
+    alignItems: 'center',
+    paddingTop: 80, 
+    paddingHorizontal: 20, 
+    zIndex: 5, 
+  },
+
+
   avatarSection: {
     alignItems: "center",
-    marginBottom: 25,
+    backgroundColor: "#3e3f3cff",
+    paddingVertical: 20,
+    borderRadius: 20,
+    marginBottom: 8, 
+    width: "100%", 
   },
   avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     borderWidth: 3,
     borderColor: "#fff",
     marginBottom: 10,
@@ -115,29 +276,170 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#000",
+    color: "#e9e1e1ff",
   },
   email: {
-    color: "#333",
+    color: "#ebe3e3ff",
     fontSize: 14,
+    marginBottom: 10,
   },
-  optionBox: {
-    backgroundColor: "#F9D56E",
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white', 
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     borderRadius: 20,
-    padding: 15,
-    marginBottom: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 2,
   },
-  optionRow: {
+  editButtonText: {
+    marginLeft: 5,
+    fontSize: 14,
+    color: 'black',
+    fontWeight: '600',
+  },
+ 
+  moreOptionsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
+    alignSelf: 'flex-start',
+    marginBottom: 15, 
+    marginTop: 8,
+    paddingHorizontal: 0,
+  },
+
+ optionBox: {
+    backgroundColor: "#f4f3eeff", 
+    borderRadius: 15,       
+    paddingHorizontal: 0,    
+    paddingVertical: 0,       
+    width: "100%",             
+    marginBottom: 20,          
+    elevation: 5,     
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+},
+
+
+optionRow: {
     flexDirection: "row",
+    justifyContent: "space-between", 
     alignItems: "center",
-    paddingVertical: 12,
-    borderBottomColor: "#fff",
-    borderBottomWidth: 1,
-  },
-  optionText: {
-    marginLeft: 15,
+    paddingVertical: 15,       
+    paddingHorizontal: 15,
+   
+   
+    borderBottomColor: "#a4823aff", 
+    borderBottomWidth: 1,      
+},
+lastOption: {
+    borderBottomWidth: 0,      
+},
+optionText: {
+    marginLeft: 5,
     fontSize: 16,
     color: "#000",
     fontWeight: "500",
+},
+});
+
+// Styles cho Modal (popup1)
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
+  container: {
+    backgroundColor: '#6f6f6bff', 
+    borderRadius: 20,
+    padding: 20,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'black',
+  },
+  content: {
+    paddingHorizontal: 5,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: 'black',
+  },
+  input: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 15,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  button: {
+    backgroundColor: '#E3A721',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  buttonText: {
+    color: 'black',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  settingsList: {
+  marginTop: 10,
+},
+settingItem: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  backgroundColor: '#eeeddeff', 
+  paddingVertical: 14,
+  paddingHorizontal: 15,
+  borderRadius: 10,
+  marginBottom: 10,
+  shadowColor: '#000',
+  shadowOpacity: 0.1,
+  shadowRadius: 2,
+  shadowOffset: { width: 0, height: 1 },
+  elevation: 2,
+},
+settingLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+settingText: {
+  marginLeft: 10,
+  fontSize: 16,
+  color: '#000',
+  fontWeight: '500',
+},
+lastItem: {
+  marginBottom: 0,
+},
+
 });
