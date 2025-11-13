@@ -1,20 +1,34 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as Location from 'expo-location';
+import { searchNearbyPlaces } from '../services/tomtomApi';
 
 const TOMTOM_API_KEY = 'yyxXlbgc7wMsUKBZY88fGXiCqM0IHspm';
+
+// Dữ liệu mẫu để test khi không có kết quả thực tế
+const SAMPLE_PLACES = [
+  { id: 's1', name: 'Quán Ăn Mẫu 1', address: 'Đường A', position: { lat: 10.7760, lon: 106.7000 }, isCheckedIn: false },
+  { id: 's2', name: 'Quán Ăn Mẫu 2 (checked)', address: 'Đường B', position: { lat: 10.7770, lon: 106.7010 }, isCheckedIn: true },
+  { id: 's3', name: 'Quán Ăn Mẫu 3', address: 'Đường C', position: { lat: 10.7750, lon: 106.6990 }, isCheckedIn: false },
+];
 
 export default function MapScreen() {
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
   const [query, setQuery] = useState('');
+  // 🏪 Danh sách các quán ăn lấy từ TomTom Nearby API
+  const [places, setPlaces] = useState([]);
+  const [showOnlyRestaurants, setShowOnlyRestaurants] = useState(false);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+  // filterMode: 'all' | 'checkedin' | 'notcheckedin'
+  const [filterMode, setFilterMode] = useState('all');
   const mapRef = useRef(null);
 
-  // 📍 Lấy vị trí hiện tại của người dùng
+  // 📍 Lấy vị trí hiện tại của người dùng + lấy danh sách quán ăn gần đó từ TomTom
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -31,6 +45,20 @@ export default function MapScreen() {
         longitudeDelta: 0.05,
       };
       setUserLocation(userRegion);
+
+      // 🏪 Gọi TomTom Nearby API để lấy danh sách quán ăn xung quanh vị trí người dùng
+      setLoadingPlaces(true);
+      const nearbyPlaces = await searchNearbyPlaces({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      });
+      // Nếu TomTom không trả về kết quả (ví dụ dev trên máy local), dùng dữ liệu mẫu để test
+      if (!nearbyPlaces || nearbyPlaces.length === 0) {
+        setPlaces(SAMPLE_PLACES);
+      } else {
+        setPlaces(nearbyPlaces);
+      }
+      setLoadingPlaces(false);
     })();
   }, []);
 
@@ -120,13 +148,42 @@ export default function MapScreen() {
         >
           <Marker coordinate={userLocation} title="Vị trí của bạn" />
           {destination && <Marker coordinate={destination} title="Điểm đến" pinColor="red" />}
+          
+          {/* 🏪 Hiển thị các quán ăn từ TomTom Nearby API
+              - Mỗi marker là một quán ăn lấy từ API
+              - Marker màu đỏ cho quán ăn
+              - Nếu `showOnlyRestaurants` = true, chỉ hiện quán ăn
+          */}
+          {places && places.length > 0 && places.map(place => {
+            const checked = !!place.isCheckedIn;
+
+            // filter theo chế độ
+            if (filterMode === 'checkedin' && !checked) return null;
+            if (filterMode === 'notcheckedin' && checked) return null;
+
+            // chọn màu marker theo chế độ
+            let pin = 'red';
+            if (filterMode === 'checkedin') pin = 'yellow';
+            else if (filterMode === 'notcheckedin') pin = '#98FB98'; // pale green
+
+            return (
+              <Marker
+                key={place.id}
+                coordinate={{ latitude: place.position.lat, longitude: place.position.lon }}
+                title={place.name}
+                description={place.address}
+                pinColor={pin}
+              />
+            );
+          })}
+          
           {routeCoords.length > 0 && (
             <Polyline coordinates={routeCoords} strokeWidth={4} strokeColor="blue" />
           )}
         </MapView>
       ) : (
         <View style={styles.loading}>
-          <Button title="Đang tải vị trí..." disabled />
+          <ActivityIndicator size="large" color="#ff6347" />
         </View>
       )}
 
@@ -139,6 +196,14 @@ export default function MapScreen() {
         />
         <Button title="Tìm" onPress={handleSearch} />
         <Button title="Chỉ đường" onPress={handleRoute} />
+      </View>
+      <View style={styles.filterContainer}>
+        <TouchableOpacity
+          style={[styles.modeButtonInline, filterMode === 'all' ? { backgroundColor: '#ff4d4d' } : filterMode === 'checkedin' ? { backgroundColor: '#ffd54f' } : { backgroundColor: '#c8f7c5' }]}
+          onPress={() => setFilterMode(prev => (prev === 'all' ? 'checkedin' : prev === 'checkedin' ? 'notcheckedin' : 'all'))}
+        >
+          <Text style={styles.modeButtonText}>{filterMode === 'all' ? 'Tất cả' : filterMode === 'checkedin' ? 'Đã check-in' : 'Chưa check-in'}</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -160,9 +225,36 @@ const styles = StyleSheet.create({
     elevation: 5,
     justifyContent: 'space-between',
   },
+  // Container cho nút filter, nằm ngay dưới searchContainer và cùng căn lề
+  filterContainer: {
+    position: 'absolute',
+    top: 40 + 60, // dưới searchContainer (searchContainer khoảng 48px cao)
+    width: '90%',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 5,
+    zIndex: 10,
+  },
   input: {
     flex: 1,
     marginRight: 5,
     padding: 5,
+  },
+  modeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    elevation: 6,
+  },
+  modeButtonText: {
+    color: '#000',
+    fontWeight: '700',
+  },
+  modeButtonInline: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    elevation: 6,
   },
 });
