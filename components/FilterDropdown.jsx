@@ -4,19 +4,24 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 export default function FilterDropdown({ visible, onSelect, onClose, style }) {
   if (!visible) return null;
 
+  // provinces list: display label and pass id/key to onSelect
+  const provinces = [
+    { id: 'hcm', label: 'TP HCM' },
+    { id: 'danang', label: 'Đà Nẵng' },
+    { id: 'quangngai', label: 'Quảng Ngãi' },
+    { id: 'hanoi', label: 'Hà Nội' },
+  ];
+
   return (
     <View style={[styles.dropdown, style]}>
-      <TouchableOpacity onPress={() => onSelect('Pizza')} style={styles.item}>
-        <Text>Món mặn</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => onSelect('Sushi')} style={styles.item}>
-        <Text>Món nước</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => onSelect('Drink')} style={styles.item}>
-        <Text>Món chay</Text>
-      </TouchableOpacity>
+      {provinces.map((p) => (
+        <TouchableOpacity key={p.id} onPress={() => onSelect && onSelect(p.id)} style={styles.item}>
+          <Text>{p.label}</Text>
+        </TouchableOpacity>
+      ))}
+
       <TouchableOpacity onPress={onClose} style={styles.item}>
-        <Text style={{ color: 'blue' }}>Close</Text>
+        <Text style={{ color: 'blue' }}>Đóng</Text>
       </TouchableOpacity>
     </View>
   );
