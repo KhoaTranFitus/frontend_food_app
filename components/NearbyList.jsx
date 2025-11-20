@@ -1,8 +1,9 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
 
-export default function NearbyList({ shownPlaces = [], onItemPress }) {
+export default function NearbyList({ shownPlaces = [], onItemPress, hasMore = false, onViewMore }) {
   if (!shownPlaces || shownPlaces.length === 0) {
     return <Text style={{ textAlign: "center", color: "gray", marginVertical: 10 }}>Không tìm thấy quán ăn gần bạn.</Text>;
   }
@@ -20,6 +21,12 @@ export default function NearbyList({ shownPlaces = [], onItemPress }) {
           </TouchableOpacity>
         </Animated.View>
       ))}
+      {hasMore && onViewMore && (
+        <TouchableOpacity style={styles.viewMoreButton} onPress={onViewMore}>
+          <Text style={styles.viewMoreText}>Xem thêm</Text>
+          <Ionicons name="chevron-forward" size={16} color="#ff6347" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -33,9 +40,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     marginHorizontal: 16,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   img: { width: 100, height: 100 },
   info: { flex: 1, padding: 10, justifyContent: "center" },
   name: { fontWeight: "700", fontSize: 16 },
   details: { color: "#666", marginTop: 4 },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#ff6347',
+    backgroundColor: '#fff',
+  },
+  viewMoreText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ff6347',
+    marginRight: 4,
+  },
 });
