@@ -24,8 +24,7 @@ const apiService = {
     return {
       name: "Bung bu", 
       email: "bitch24c02@gmail.com",
-      avatarUrl: "https://i.pinimg.com/564x/0c/7c/42/0c7c42856e59f7db5e9d08b5f83b09eb.jpg",
-      // Giả sử có thêm số điện thoại, địa chỉ...
+      
     };
   },
   changePassword: async (oldPassword, newPassword) => {
@@ -47,7 +46,8 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState({
     name: 'Loading...',
     email: 'loading@app.com',
-    avatarUrl: 'https://via.placeholder.com/120',
+    
+
   });
   const [showSettingsModal, setShowSettingsModal] = useState(false); // Quản lý popup1
   const [oldPassword, setOldPassword] = useState('');
@@ -120,7 +120,7 @@ export default function ProfileScreen() {
         {/* 🖼️ AVATAR & INFO (Sử dụng dữ liệu State) */}
         <View style={styles.avatarSection}>
           <Image
-            source={{ uri: profile.avatarUrl }}
+            source={require("../assets/avatar.png")}
             style={styles.avatar}
           />
           <Text style={styles.name}>{profile.name}</Text>
@@ -139,21 +139,28 @@ export default function ProfileScreen() {
         {/* 📦 OPTION BOX */}
         <View style={styles.optionBox}>
           {/* Saved Dishes */}
-          <TouchableOpacity style={styles.optionRow}>
-            <Feather name="bookmark" size={22} color="#000" />
-            <Text style={styles.optionText}>Saved Dishes</Text>
+        
+          <TouchableOpacity style={styles.optionCard}>
+            <View style={styles.optionLeft}>
+              <Feather name="bookmark" size={22} color="#000" />
+              <Text style={styles.optionText}>Saved Dishes</Text>
+            </View>
           </TouchableOpacity>
 
           {/* Help & Support */}
-          <TouchableOpacity style={styles.optionRow}>
-            <Ionicons name="help-circle-outline" size={22} color="#000" />
-            <Text style={styles.optionText}>Help & Support</Text>
+          <TouchableOpacity style={styles.optionCard}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="help-circle-outline" size={22} color="#000" />
+              <Text style={styles.optionText}>Help & Support</Text>
+            </View>
           </TouchableOpacity>
 
-          {/* Log Out */}
-          <TouchableOpacity style={[styles.optionRow, styles.lastOption]} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color="red" />
-            <Text style={[styles.optionText, { color: "red" }]}>Log Out</Text>
+          {/* Logout */}
+          <TouchableOpacity style={styles.optionCard} onPress={handleLogout}>
+            <View style={styles.optionLeft}>
+              <Ionicons name="log-out-outline" size={22} color="red" />
+              <Text style={[styles.optionText, { color: "red" }]}>Log Out</Text>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -200,7 +207,13 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward-outline" size={20} color="#000" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={[modalStyles.settingItem, modalStyles.lastItem]}>
+            <TouchableOpacity
+              style={[modalStyles.settingItem, modalStyles.lastItem]}
+              onPress={() => {
+                setShowSettingsModal(false);      
+                navigation.navigate("AboutApp");  
+              }}
+            >
               <View style={modalStyles.settingLeft}>
                 <Ionicons name="information-circle-outline" size={22} color="#000" />
                 <Text style={modalStyles.settingText}>About App</Text>
@@ -259,12 +272,18 @@ const styles = StyleSheet.create({
 
   avatarSection: {
     alignItems: "center",
-    backgroundColor: "#3e3f3cff",
+    backgroundColor: "white",   
     paddingVertical: 20,
     borderRadius: 20,
-    marginBottom: 8, 
-    width: "100%", 
+    marginBottom: 20,
+    width: "100%",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
+
   avatar: {
     width: 100,
     height: 100,
@@ -276,26 +295,28 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#e9e1e1ff",
+    color: "#111",
   },
   email: {
-    color: "#ebe3e3ff",
+    color: "#111",
     fontSize: 14,
     marginBottom: 10,
   },
   editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white', 
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 2,
-  },
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#FFE08C",   // màu vàng nhẹ
+  paddingVertical: 10,
+  paddingHorizontal: 20,
+  borderRadius: 25,
+
+  shadowColor: "#000",
+  shadowOpacity: 0.15,
+  shadowRadius: 3,
+  shadowOffset: { width: 0, height: 1 },
+  elevation: 3,
+},
+
   editButtonText: {
     marginLeft: 5,
     fontSize: 14,
@@ -313,35 +334,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
 
- optionBox: {
-    backgroundColor: "#f4f3eeff", 
-    borderRadius: 15,       
-    paddingHorizontal: 0,    
-    paddingVertical: 0,       
-    width: "100%",             
-    marginBottom: 20,          
-    elevation: 5,     
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
+ optionCard: {
+  backgroundColor: "white",
+  paddingVertical: 15,
+  paddingHorizontal: 15,
+  borderRadius: 15,
+  marginBottom: 12,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+
+  shadowColor: "#000",
+  shadowOpacity: 0.12,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 4,
+},
+optionLeft: {
+  flexDirection: "row",
+  alignItems: "center",
+},
+optionText: {
+  marginLeft: 10,
+  fontSize: 16,
+  fontWeight: "500",
+  color: "#000",
 },
 
-
-optionRow: {
-    flexDirection: "row",
-    justifyContent: "space-between", 
-    alignItems: "center",
-    paddingVertical: 15,       
-    paddingHorizontal: 15,
-   
-   
-    borderBottomColor: "#a4823aff", 
-    borderBottomWidth: 1,      
-},
-lastOption: {
-    borderBottomWidth: 0,      
-},
 optionText: {
     marginLeft: 5,
     fontSize: 16,
