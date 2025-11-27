@@ -47,6 +47,7 @@ export async function searchNearbyPlaces({ latitude, longitude }) {
       position: place.position,
       category: place.poi?.categories?.[0] || "",
       rating: place.poi?.rating || null,
+      dishType: 'dry', // Mặc định các place từ API là 'dry', có thể thay đổi sau
     }));
   } catch (err) {
     console.warn("TomTom nearby search error", err.message);

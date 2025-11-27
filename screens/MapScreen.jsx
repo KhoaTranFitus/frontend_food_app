@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Animated, Dimensions, Pressable } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Animated, Dimensions, Pressable, ScrollView } from 'react-native';
+import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as Location from 'expo-location';
@@ -10,12 +10,15 @@ const TOMTOM_API_KEY = 'yyxXlbgc7wMsUKBZY88fGXiCqM0IHspm';
 
 // Dữ liệu mẫu để test khi không có kết quả thực tế
 const SAMPLE_PLACES = [
-  { id: 's1', name: 'Quán Ăn Mẫu 1 chưa checkin', address: 'Đường A', position: { lat: 10.7760, lon: 106.7000 }, isCheckedIn: false },
-  { id: 's2', name: 'Quán Ăn Mẫu 2 (checked)', address: 'Đường B', position: { lat: 10.7770, lon: 106.7010 }, isCheckedIn: true },
-  { id: 's3', name: 'Quán Ăn Mẫu 3 chưa checkin', address: 'Đường C', position: { lat: 10.7750, lon: 106.6990 }, isCheckedIn: false },
+  { id: 's1', name: 'Quán Ăn Mẫu 1 - Món Khô', address: 'Đường A', position: { lat: 10.7760, lon: 106.7000 }, dishType: 'dry' },
+  { id: 's2', name: 'Quán Ăn Mẫu 2 - Món Nước', address: 'Đường B', position: { lat: 10.7770, lon: 106.7010 }, dishType: 'soup' },
+  { id: 's3', name: 'Quán Ăn Mẫu 3 - Món Khô', address: 'Đường C', position: { lat: 10.7750, lon: 106.6990 }, dishType: 'dry' },
+  { id: 's4', name: 'Quán Ăn Mẫu 4 - Món Chay', address: 'Đường D', position: { lat: 10.7780, lon: 106.7020 }, dishType: 'vegetarian' },
+  { id: 's5', name: 'Quán Ăn Mẫu 5 - Món Mặn', address: 'Đường E', position: { lat: 10.7740, lon: 106.6980 }, dishType: 'salty' },
+  { id: 's6', name: 'Quán Ăn Mẫu 6 - Hải Sản', address: 'Đường F', position: { lat: 10.7755, lon: 106.7005 }, dishType: 'seafood' },
 ];
 
-export default function MapScreen() {
+export default function MapScreen({ navigation }) {
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
@@ -24,20 +27,22 @@ export default function MapScreen() {
   const [places, setPlaces] = useState([]);
   const [showOnlyRestaurants, setShowOnlyRestaurants] = useState(false);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
-  // filterMode: 'all' | 'checkedin' | 'notcheckedin'
-  const [filterMode, setFilterMode] = useState('all');
   const mapRef = useRef(null);
 
   // --- MENU SLIDE-IN + CHECKBOX STATES ---
   const screenWidth = Dimensions.get('window').width;
-  // <-- mở rộng rộng popup lên ~1/3 màn hình (tránh wrap text)
-  const panelWidth = Math.round(screenWidth / 3);
+  const screenHeight = Dimensions.get('window').height;
+  // <-- Panel rộng 50% màn hình, cao tối đa 70% màn hình
+  const panelWidth = Math.round(screenWidth / 2);
   const animX = useRef(new Animated.Value(-panelWidth)).current;
   const [menuVisible, setMenuVisible] = useState(false);
   // checkbox states: default all selected
   const [chkAll, setChkAll] = useState(true);
-  const [chkCheckedIn, setChkCheckedIn] = useState(true);
-  const [chkNotCheckedIn, setChkNotCheckedIn] = useState(true);
+  const [chkDry, setChkDry] = useState(true);
+  const [chkSoup, setChkSoup] = useState(true);
+  const [chkVegetarian, setChkVegetarian] = useState(true);
+  const [chkSalty, setChkSalty] = useState(true);
+  const [chkSeafood, setChkSeafood] = useState(true);
   // tính vị trí panel để nằm dưới thanh tìm kiếm (searchContainer top + approx height)
   const searchTop = 40;
   const searchHeight = 56; // nếu searchContainer thay đổi height, điều chỉnh ở đây
@@ -61,26 +66,74 @@ export default function MapScreen() {
   const toggleAll = () => {
     const newVal = !chkAll;
     setChkAll(newVal);
-    setChkCheckedIn(newVal);
-    setChkNotCheckedIn(newVal);
+    setChkDry(newVal);
+    setChkSoup(newVal);
+    setChkVegetarian(newVal);
+    setChkSalty(newVal);
+    setChkSeafood(newVal);
   };
-  const toggleCheckedIn = () => {
-    const next = !chkCheckedIn;
-    setChkCheckedIn(next);
-    // update 'all' depending on both children
-    setChkAll(next && chkNotCheckedIn);
+  const toggleDry = () => {
+    const next = !chkDry;
+    setChkDry(next);
+    setChkAll(next && chkSoup && chkVegetarian && chkSalty && chkSeafood);
   };
-  const toggleNotCheckedIn = () => {
-    const next = !chkNotCheckedIn;
-    setChkNotCheckedIn(next);
-    setChkAll(chkCheckedIn && next);
+  const toggleSoup = () => {
+    const next = !chkSoup;
+    setChkSoup(next);
+    setChkAll(chkDry && next && chkVegetarian && chkSalty && chkSeafood);
   };
-  // helper to decide visibility of a place
+  const toggleVegetarian = () => {
+    const next = !chkVegetarian;
+    setChkVegetarian(next);
+    setChkAll(chkDry && chkSoup && next && chkSalty && chkSeafood);
+  };
+  const toggleSalty = () => {
+    const next = !chkSalty;
+    setChkSalty(next);
+    setChkAll(chkDry && chkSoup && chkVegetarian && next && chkSeafood);
+  };
+  const toggleSeafood = () => {
+    const next = !chkSeafood;
+    setChkSeafood(next);
+    setChkAll(chkDry && chkSoup && chkVegetarian && chkSalty && next);
+  };
+  // helper to decide visibility of a place based on dishType
   const shouldShowPlace = (place) => {
-    // if neither selected, show none
-    if (!chkCheckedIn && !chkNotCheckedIn) return false;
-    if (place.isCheckedIn) return chkCheckedIn;
-    return chkNotCheckedIn;
+    // if all unchecked, show none
+    if (!chkDry && !chkSoup && !chkVegetarian && !chkSalty && !chkSeafood) return false;
+    // Handle places without dishType (shouldn't happen, but just in case)
+    const type = place.dishType || 'dry'; // Default to 'dry' if missing
+    if (type === 'dry') return chkDry;
+    if (type === 'soup') return chkSoup;
+    if (type === 'vegetarian') return chkVegetarian;
+    if (type === 'salty') return chkSalty;
+    if (type === 'seafood') return chkSeafood;
+    return true; // Show unknown types by default
+  };
+  // Function to determine marker color based on dishType
+  const getMarkerStyleByDishType = (dishType) => {
+    if (dishType === 'dry') {
+      return { 
+        pinColor: '#FF9500', // Orange for dry dishes
+      };
+    } else if (dishType === 'soup') {
+      return { 
+        pinColor: '#00BCD4', // Cyan/Teal for soup dishes
+      };
+    } else if (dishType === 'vegetarian') {
+      return {
+        pinColor: '#4CAF50', // Green for vegetarian dishes
+      };
+    } else if (dishType === 'salty') {
+      return {
+        pinColor: '#F44336', // Red for salty dishes
+      };
+    } else if (dishType === 'seafood') {
+      return {
+        pinColor: '#2196F3', // Blue for seafood dishes
+      };
+    }
+    return { pinColor: 'red' }; // Default fallback
   };
   // --- end menu/check logic ---
 
@@ -204,6 +257,25 @@ export default function MapScreen() {
     }
   };
 
+  // Handle restaurant marker callout press - navigate to RestaurantDetail
+  const handleRestaurantPress = (place) => {
+    const item = {
+      id: place.id,
+      name: place.name,
+      address: place.address,
+      position: place.position,
+      dishType: place.dishType,
+      rating: place.rating || 4.5,
+      category: place.category || 'Restaurant',
+      image: require('../assets/amthuc.jpg'), // Default image
+    };
+    // Navigate to nested screen in HomeStackNavigator
+    navigation.navigate('HomeStack', {
+      screen: 'RestaurantDetail',
+      params: { item }
+    });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {userLocation ? (
@@ -216,17 +288,13 @@ export default function MapScreen() {
           <Marker coordinate={userLocation} title="Vị trí của bạn" />
           {destination && <Marker coordinate={destination} title="Điểm đến" pinColor="red" />}
 
-          {/* Hiển thị chung: API + SAMPLE_PLACES, TUÂN THEO 3 CHECKBOX */}
+          {/* Hiển thị chung: API + SAMPLE_PLACES, TUÂN THEO FILTER DISHTYPE */}
           {combinedPlaces && combinedPlaces.length > 0 && combinedPlaces.map(place => {
             // quyết định hiển thị theo checkbox
             if (!shouldShowPlace(place)) return null;
-            const checked = !!place.isCheckedIn;
 
-            // màu marker:
-            let pin = 'red';
-            if (checked) pin = 'green'; // đã check-in
-            else if (place._isSample) pin = 'red'; // sample chưa checkin(red)
-            else pin = 'red'; // API chưa checkin
+            // xác định màu marker dựa trên dishType
+            const markerStyle = getMarkerStyleByDishType(place.dishType);
 
             return (
               <Marker
@@ -234,8 +302,16 @@ export default function MapScreen() {
                 coordinate={{ latitude: place.position.lat, longitude: place.position.lon }}
                 title={place.name}
                 description={place.address}
-                pinColor={pin}
-              />
+                pinColor={markerStyle.pinColor}
+              >
+                <Callout onPress={() => handleRestaurantPress(place)} tooltip={true}>
+                  <View style={styles.calloutContainer}>
+                    <Text style={styles.calloutTitle}>{place.name}</Text>
+                    <Text style={styles.calloutAddress}>{place.address}</Text>
+                    <Text style={styles.calloutTapHint}>Nhấn để xem chi tiết</Text>
+                  </View>
+                </Callout>
+              </Marker>
             );
           })}
            
@@ -271,31 +347,51 @@ export default function MapScreen() {
         <>
           {/* dimming visual - KHÔNG chặn tương tác với map (pointerEvents='none') */}
           <View style={styles.overlay} pointerEvents="none" />
-          <Animated.View style={[styles.panel, { width: panelWidth, top: panelTop, transform: [{ translateX: animX }] }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Animated.View style={[styles.panel, { transform: [{ translateX: animX }] }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 8 }}>
               <Text style={styles.panelTitle}>Bộ lọc</Text>
               <TouchableOpacity onPress={closeMenu} style={styles.closeBtn}>
                 <Text style={styles.closeTxt}>✕</Text>
               </TouchableOpacity>
             </View>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true}>
              <TouchableOpacity style={styles.row} onPress={toggleAll}>
                <View style={[styles.checkbox, chkAll && styles.checkboxChecked]}>
                  {chkAll && <Text style={styles.checkMark}>✓</Text>}
                </View>
                <Text style={styles.rowText}>Tất cả</Text>
              </TouchableOpacity>
-             <TouchableOpacity style={styles.row} onPress={toggleCheckedIn}>
-               <View style={[styles.checkbox, chkCheckedIn && styles.checkboxChecked]}>
-                 {chkCheckedIn && <Text style={styles.checkMark}>✓</Text>}
+             <TouchableOpacity style={styles.row} onPress={toggleDry}>
+               <View style={[styles.checkbox, chkDry && styles.checkboxChecked]}>
+                 {chkDry && <Text style={styles.checkMark}>✓</Text>}
                </View>
-               <Text style={styles.rowText}>Đã check-in</Text>
+               <Text style={styles.rowText}>Món Khô (Dry)</Text>
              </TouchableOpacity>
-             <TouchableOpacity style={styles.row} onPress={toggleNotCheckedIn}>
-               <View style={[styles.checkbox, chkNotCheckedIn && styles.checkboxChecked]}>
-                 {chkNotCheckedIn && <Text style={styles.checkMark}>✓</Text>}
+             <TouchableOpacity style={styles.row} onPress={toggleSoup}>
+               <View style={[styles.checkbox, chkSoup && styles.checkboxChecked]}>
+                 {chkSoup && <Text style={styles.checkMark}>✓</Text>}
                </View>
-               <Text style={styles.rowText}>Chưa check-in</Text>
+               <Text style={styles.rowText}>Món Nước (Soup)</Text>
              </TouchableOpacity>
+             <TouchableOpacity style={styles.row} onPress={toggleVegetarian}>
+               <View style={[styles.checkbox, chkVegetarian && styles.checkboxChecked]}>
+                 {chkVegetarian && <Text style={styles.checkMark}>✓</Text>}
+               </View>
+               <Text style={styles.rowText}>Món Chay (Vegetarian)</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={styles.row} onPress={toggleSalty}>
+               <View style={[styles.checkbox, chkSalty && styles.checkboxChecked]}>
+                 {chkSalty && <Text style={styles.checkMark}>✓</Text>}
+               </View>
+               <Text style={styles.rowText}>Món Mặn (Salty)</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={styles.row} onPress={toggleSeafood}>
+               <View style={[styles.checkbox, chkSeafood && styles.checkboxChecked]}>
+                 {chkSeafood && <Text style={styles.checkMark}>✓</Text>}
+               </View>
+               <Text style={styles.rowText}>Hải Sản (Seafood)</Text>
+             </TouchableOpacity>
+            </ScrollView>
            </Animated.View>
          </>
        )}
@@ -339,20 +435,21 @@ export default function MapScreen() {
    panel: {
      position: 'absolute',
      left: 0,
-    // top được set động (panelTop) khi render để hạ xuống dưới thanh tìm kiếm
+     top: 96, // searchTop (40) + searchHeight (56)
+     bottom: 0, // Kéo dài xuống tận đáy màn hình
+     width: '50%', // Rộng 50% màn hình
      backgroundColor: '#fff',
-     paddingVertical: 12,
-     paddingHorizontal: 14,
+     paddingVertical: 10,
+     paddingHorizontal: 12,
      elevation: 8,
      zIndex: 30,
      borderTopRightRadius: 12,
-     borderBottomRightRadius: 12,
-     // bo góc tổng quát để tránh cạnh sắc (nếu muốn bo cả trái, thay bằng borderRadius)
      overflow: 'hidden',
+     flexDirection: 'column', // Để ScrollView có thể flex
    },
-   panelTitle: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
-   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-   rowText: { marginLeft: 10, fontSize: 15, flexShrink: 1 },
+   panelTitle: { fontSize: 14, fontWeight: '700', marginBottom: 10 },
+   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+   rowText: { marginLeft: 10, fontSize: 13, flexShrink: 1 },
    checkbox: {
      width: 20,
      height: 20,
@@ -416,5 +513,29 @@ export default function MapScreen() {
      paddingVertical: 8,
      borderRadius: 8,
      elevation: 6,
+   },
+   calloutContainer: {
+     padding: 12,
+     backgroundColor: '#fff',
+     borderRadius: 8,
+     minWidth: 200,
+     paddingVertical: 8,
+   },
+   calloutTitle: {
+     fontSize: 14,
+     fontWeight: '700',
+     marginBottom: 4,
+     color: '#333',
+   },
+   calloutAddress: {
+     fontSize: 12,
+     color: '#666',
+     marginBottom: 6,
+   },
+   calloutTapHint: {
+     fontSize: 11,
+     color: '#2196F3',
+     fontWeight: '600',
+     fontStyle: 'italic',
    },
  });
