@@ -1,18 +1,20 @@
 // FoodDetailScreen.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons'; 
+// XÓA: import * as Location from 'expo-location'; 
+// XÓA: import { getRoute } from '../services/tomtomApi'; 
 
 // Định nghĩa màu sắc cơ bản (đồng bộ với COLORS từ RestaurantDetailScreen)
-const DETAIL_COLORS = {
-  BACKGROUND: '#8FD9FB',
+const COLORS = {
+  BACKGROUND: '#9a0e0eff',
   CARD_BACKGROUND: '#FFFFFF',
   PRIMARY_TEXT: '#111111',
   SECONDARY_TEXT: '#333333',
-  ACCENT: '#006B8F',
-  BORDER: '#8FD9FB',
+  ACCENT: '#ff6347',
+  BORDER: '#EEEEEE',
   STAR: '#FFC300',
   FAV_RED: '#FF3B30',
   FAV_GRAY: '#CCCCCC',
@@ -27,7 +29,7 @@ const getRandomAvatarColor = () => {
   return AVATAR_COLORS[index];
 };
 
-// Dữ liệu giả định cho Nhà hàng bán món ăn (Đã thêm image và rating đầy đủ)
+// Dữ liệu giả định cho Nhà hàng bán món ăn
 const sellingRestaurant = {
     id: 'rest101',
     name: 'Phố Cũ Quán',
@@ -48,6 +50,8 @@ export default function FoodDetailScreen({ route, navigation }) {
   const [userRating, setUserRating] = useState(0); 
   const [userComment, setUserComment] = useState(''); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
+  
+  // XÓA STATE: userLoc, loading, routeCoords
 
   // Dữ liệu giả định
   const defaultDetails = {
@@ -55,8 +59,20 @@ export default function FoodDetailScreen({ route, navigation }) {
     description: 'Món ăn đặc trưng được chế biến tỉ mỉ từ những nguyên liệu tươi ngon nhất, giữ trọn hương vị truyền thống.',
   };
 
+  // XÓA: useEffect Lấy vị trí
+
   const handleToggleFavorite = () => {
       setIsFavorite(!isFavorite);
+  };
+
+  const handleGoBack = () => {
+      navigation.goBack();
+  };
+
+  // ⭐️ HÀM CHỈ ĐƯỜNG: CHUYỂN HƯỚNG TRỰC TIẾP ⭐️
+  const handleNavigate = () => {
+    // Không cần logic vị trí hay loading, chỉ cần chuyển hướng
+    navigation.navigate('Map');
   };
   
   const handleSubmitReview = async () => {
@@ -85,16 +101,17 @@ export default function FoodDetailScreen({ route, navigation }) {
   };
 
   const renderRating = () => {
+    let ratingValue = 4;
     if (item?.rating) {
-      return <Text style={{ color: DETAIL_COLORS.STAR }}>{item.rating} ⭐</Text>;
-    }
-    
-    const placeholderRating = 4;
+      ratingValue = Math.min(5, Math.max(0, Math.round(parseFloat(item.rating))));
+    } 
     return (
-      <Text style={{ color: DETAIL_COLORS.STAR }}>
-        {Array(placeholderRating).fill('★').join('')}
-        <Text style={{ color: DETAIL_COLORS.SECONDARY_TEXT }}>
-          {Array(5 - placeholderRating).fill('★').join('')}
+      <Text style={styles.ratingText}>
+        <Text style={{ color: COLORS.STAR }}>
+          {Array(ratingValue).fill('★').join('')}
+        </Text>
+        <Text style={{ color: COLORS.SECONDARY_TEXT }}>
+          {Array(5 - ratingValue).fill('★').join('')}
         </Text>
       </Text>
     );
@@ -109,6 +126,10 @@ export default function FoodDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={32} color={COLORS.ACCENT} />
+      </TouchableOpacity>
+
       <ScrollView>
         <Image 
           source={item?.image || require('../assets/amthuc.jpg')} 
@@ -117,30 +138,26 @@ export default function FoodDetailScreen({ route, navigation }) {
         
         <View style={styles.content}>
           
-          {/* TÊN MÓN ĂN VÀ YÊU THÍCH */}
           <View style={styles.titleRow}>
             <Text style={styles.foodName}>{item?.name || 'Món ăn không tên'}</Text>
             <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
                 <Ionicons 
                     name={isFavorite ? "heart" : "heart-outline"} 
                     size={30} 
-                    color={isFavorite ? DETAIL_COLORS.FAV_RED : DETAIL_COLORS.FAV_GRAY} 
+                    color={isFavorite ? COLORS.FAV_RED : COLORS.FAV_GRAY} 
                 />
             </TouchableOpacity>
           </View>
           
-          {/* RATING VÀ GIÁ */}
           <View style={styles.infoRow}>
-            <Text style={styles.ratingText}>
-                {renderRating()}
-            </Text>
+            {renderRating()}
             <Text style={styles.price}>{item?.price || defaultDetails.price}</Text>
           </View>
           
           <Text style={styles.sectionHeader}>Mô tả</Text>
           <Text style={styles.description}>{item?.description || defaultDetails.description}</Text>
 
-          {/* ⭐️ PHẦN NHÀ HÀNG BÁN ĐÃ SỬA ĐỔI ⭐️ */}
+          <Text style={styles.sectionHeader}>Nhà hàng bán</Text>
           <TouchableOpacity style={styles.restaurantCard} onPress={navigateToRestaurantDetail}>
             <View style={[styles.restAvatar, { backgroundColor: sellingRestaurant.avatarColor }]}>
                 <Text style={styles.restAvatarText}>{sellingRestaurant.name[0]}</Text>
@@ -148,18 +165,15 @@ export default function FoodDetailScreen({ route, navigation }) {
             <Text style={styles.restName}>{sellingRestaurant.name}</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.orderButton}>
-            <Text style={styles.orderText}>Đặt món ngay</Text>
+          <TouchableOpacity style={styles.ctaButton} onPress={handleNavigate}>
+            <Text style={styles.orderText}>Chỉ đường đến nhà hàng</Text>
           </TouchableOpacity>
         </View>
 
-        {/* ================================================= */}
-        {/* PHẦN ĐÁNH GIÁ (REVIEW) */}
-        {/* ================================================= */}
+        {/* PHẦN ĐÁNH GIÁ */}
         <View style={styles.reviewSection}>
           <Text style={styles.reviewHeader}>Đánh giá của bạn</Text>
           
-          {/* Form Đánh giá */}
           <View style={styles.ratingForm}>
             <Text style={styles.formLabel}>Số sao:</Text>
             <View style={styles.starContainer}>
@@ -169,7 +183,7 @@ export default function FoodDetailScreen({ route, navigation }) {
                   onPress={() => setUserRating(star)}
                   disabled={isSubmitting}
                 >
-                  <Text style={[styles.star, { color: star <= userRating ? DETAIL_COLORS.STAR : DETAIL_COLORS.SECONDARY_TEXT }]}>
+                  <Text style={[styles.star, { color: star <= userRating ? COLORS.STAR : COLORS.SECONDARY_TEXT }]}>
                     ★
                   </Text>
                 </TouchableOpacity>
@@ -180,7 +194,7 @@ export default function FoodDetailScreen({ route, navigation }) {
             <TextInput
               style={styles.commentInput}
               placeholder="Chia sẻ trải nghiệm của bạn..."
-              placeholderTextColor={DETAIL_COLORS.SECONDARY_TEXT}
+              placeholderTextColor={COLORS.SECONDARY_TEXT}
               multiline
               value={userComment}
               onChangeText={setUserComment}
@@ -193,14 +207,13 @@ export default function FoodDetailScreen({ route, navigation }) {
               disabled={isSubmitting || userRating === 0}
             >
               {isSubmitting ? (
-                <ActivityIndicator color={DETAIL_COLORS.CARD_BACKGROUND} />
+                <ActivityIndicator color={COLORS.CARD_BACKGROUND} />
               ) : (
                 <Text style={styles.submitText}>Gửi Đánh giá</Text>
               )}
             </TouchableOpacity>
           </View>
 
-          {/* Danh sách Đánh giá */}
           <Text style={styles.reviewHeader}>Tất cả Đánh giá ({reviews.length})</Text>
           {reviews.length === 0 ? (
             <Text style={styles.noReviews}>Chưa có đánh giá nào. Hãy là người đầu tiên!</Text>
@@ -222,10 +235,10 @@ export default function FoodDetailScreen({ route, navigation }) {
                 </View>
                 
                 <Text style={styles.reviewRating}>
-                  <Text style={{ color: DETAIL_COLORS.STAR }}>
+                  <Text style={{ color: COLORS.STAR }}>
                     {Array(review.rating).fill('★').join('')}
                   </Text>
-                  <Text style={{ color: DETAIL_COLORS.SECONDARY_TEXT }}>
+                  <Text style={{ color: COLORS.SECONDARY_TEXT }}>
                     {Array(5 - review.rating).fill('★').join('')}
                   </Text>
                 </Text>
@@ -242,7 +255,13 @@ export default function FoodDetailScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: DETAIL_COLORS.BACKGROUND,
+    backgroundColor: COLORS.BACKGROUND,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 55,
+    left: 20, 
+    zIndex: 10,
   },
   foodImage: {
     width: '100%',
@@ -250,12 +269,11 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   content: {
-    backgroundColor: DETAIL_COLORS.CARD_BACKGROUND,
+    backgroundColor: COLORS.CARD_BACKGROUND,
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     marginTop: -20,
-    marginHorizontal: 8,
   },
   
   titleRow: {
@@ -267,7 +285,7 @@ const styles = StyleSheet.create({
   foodName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: DETAIL_COLORS.ACCENT,
+    color: COLORS.ACCENT,
     flexShrink: 1,
   },
   favoriteButton: {
@@ -281,7 +299,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: DETAIL_COLORS.BORDER,
+    borderBottomColor: COLORS.BORDER,
   },
   ratingText: {
     fontSize: 20,
@@ -290,19 +308,17 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 20,
     fontWeight: '600',
-    color: DETAIL_COLORS.PRIMARY_TEXT,
+    color: COLORS.PRIMARY_TEXT,
   },
   
-  // ⭐️ STYLES ĐÃ CHỈNH SỬA CHO NHÀ HÀNG BÁN ⭐️
   restaurantCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10, // Giảm padding dọc
-    // ❌ BỎ BACKGROUND MÀU NHẸ VÀ BỎ VIỀN
+    paddingVertical: 10,
     marginBottom: 20,
     marginTop: 5,
-    borderBottomWidth: 1, // Tạo đường kẻ mỏng phía dưới
-    borderBottomColor: DETAIL_COLORS.BORDER,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
   },
   restAvatar: {
     width: 40,
@@ -313,7 +329,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   restAvatarText: {
-    color: DETAIL_COLORS.CARD_BACKGROUND,
+    color: COLORS.CARD_BACKGROUND,
     fontWeight: 'bold',
     fontSize: 18,
   },
@@ -321,24 +337,25 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     fontWeight: '600',
-    color: DETAIL_COLORS.PRIMARY_TEXT,
+    color: COLORS.PRIMARY_TEXT,
   },
   
   sectionHeader: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: DETAIL_COLORS.PRIMARY_TEXT,
+    color: COLORS.PRIMARY_TEXT,
     marginTop: 15,
     marginBottom: 5,
   },
   description: {
     fontSize: 16,
-    color: DETAIL_COLORS.SECONDARY_TEXT,
+    color: COLORS.SECONDARY_TEXT,
     lineHeight: 24,
     marginBottom: 20,
   },
-  orderButton: {
-    backgroundColor: DETAIL_COLORS.ACCENT,
+
+  ctaButton: {
+    backgroundColor: COLORS.ACCENT,
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
@@ -346,26 +363,24 @@ const styles = StyleSheet.create({
     marginBottom: 50,
   },
   orderText: {
-    color: DETAIL_COLORS.CARD_BACKGROUND,
+    color: COLORS.CARD_BACKGROUND,
     fontWeight: 'bold',
     fontSize: 18,
   },
 
-  // STYLES ĐÁNH GIÁ (giữ nguyên)
   reviewSection: {
     padding: 16,
-    backgroundColor: DETAIL_COLORS.CARD_BACKGROUND,
-    marginHorizontal: 8,
+    backgroundColor: COLORS.CARD_BACKGROUND,
     marginTop: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.BORDER,
+    borderColor: COLORS.BORDER,
     marginBottom: 20,
   },
   reviewHeader: {
     fontSize: 18,
     fontWeight: '800',
-    color: DETAIL_COLORS.PRIMARY_TEXT,
+    color: COLORS.PRIMARY_TEXT,
     marginBottom: 10,
     marginTop: 10,
   },
@@ -374,13 +389,13 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.BORDER,
-    backgroundColor: '#F0F8FF',
+    borderColor: COLORS.BORDER,
+    backgroundColor: '#F7F7F7',
   },
   formLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: DETAIL_COLORS.PRIMARY_TEXT,
+    color: COLORS.PRIMARY_TEXT,
     marginTop: 10,
     marginBottom: 5,
   },
@@ -394,22 +409,22 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     height: 80,
-    borderColor: DETAIL_COLORS.BORDER,
+    borderColor: COLORS.BORDER,
     borderWidth: 1,
     borderRadius: 8,
     padding: 10,
     textAlignVertical: 'top',
-    color: DETAIL_COLORS.PRIMARY_TEXT,
+    color: COLORS.PRIMARY_TEXT,
   },
   submitButton: {
     marginTop: 16,
-    backgroundColor: DETAIL_COLORS.ACCENT, 
+    backgroundColor: COLORS.ACCENT, 
     padding: 12,
     alignItems: 'center',
     borderRadius: 12,
   },
   submitText: {
-    color: DETAIL_COLORS.CARD_BACKGROUND,
+    color: COLORS.CARD_BACKGROUND,
     fontWeight: '700',
   },
   disabledButton: {
@@ -435,13 +450,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    color: DETAIL_COLORS.CARD_BACKGROUND, 
+    color: COLORS.CARD_BACKGROUND, 
     fontWeight: 'bold',
     fontSize: 14,
   },
   reviewUser: {
     fontWeight: '700',
-    color: DETAIL_COLORS.ACCENT,
+    color: COLORS.ACCENT,
   },
   reviewRating: {
     fontSize: 20,
@@ -449,12 +464,12 @@ const styles = StyleSheet.create({
     marginLeft: 40, 
   },
   reviewComment: {
-    color: DETAIL_COLORS.SECONDARY_TEXT,
+    color: COLORS.SECONDARY_TEXT,
     marginLeft: 40, 
   },
   noReviews: {
     fontStyle: 'italic',
-    color: DETAIL_COLORS.SECONDARY_TEXT,
+    color: COLORS.SECONDARY_TEXT,
     marginBottom: 10,
   }
 });
