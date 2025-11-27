@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 export default function AllCategoriesScreen({ navigation, route }) {
-  const { categories, onCategoryPress } = route.params || {
-    categories: [],
-    onCategoryPress: () => {},
-  };
+  const { categories } = route.params || { categories: [] };
 
   const handleCategoryPress = (categoryName) => {
-    onCategoryPress(categoryName);
-    navigation.goBack();
+    // Truyền danh mục qua params và gọi search từ HomeScreen sau khi quay lại
+    navigation.navigate('Home', { selectedCategory: categoryName });
   };
 
   const renderCategoryItem = ({ item }) => (

@@ -97,7 +97,7 @@ export default function HomeHeader({
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 16, paddingTop: 36, flexDirection: "row", alignItems: "center" },
+  header: { paddingHorizontal: 16, paddingTop: 36, flexDirection: "row", alignItems: "center" , borderRadius: 12},
   welcomeText: { fontSize: 32, fontWeight: "700", color: "#07212A" },
   subText: { color: "#08404A", marginTop: 6 },
   rightButtons: { flexDirection: "row", alignItems: "center" },

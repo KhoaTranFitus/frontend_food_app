@@ -38,7 +38,7 @@ export default function MainTabs() {
               name={iconName}
               focused={focused}
               size={size}
-              color={focused ? "#ff6347" : "gray"}
+              color={focused ? "#9f0b0bff" : "gray"}
             />
           );
         },
