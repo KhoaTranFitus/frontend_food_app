@@ -22,23 +22,24 @@ import NearbyList from "../components/NearbyList";
 import { normalizeResults, PROVINCES, searchByProvince, searchByQuery } from "../services/homeService";
 import { useHeaderAnimation } from "../hooks/useHeaderAnimation";
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const [query, setQuery] = useState("");
   const [places, setPlaces] = useState([]);
   const [userLoc, setUserLoc] = useState(null);
   const [filteredPlaces, setFilteredPlaces] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const mapRef = useRef(null);
   const { handleScroll, headerAnimatedStyle } = useHeaderAnimation();
 
   const categories = [
-    { name: "Món mặn", icon: require("../assets/amthuc.jpg") },
-    { name: "Món nước", icon: require("../assets/amthuc.jpg") },
-    { name: "Món chay", icon: require("../assets/amthuc.jpg") },
-    { name: "Tráng miệng", icon: require("../assets/amthuc.jpg") },
-    { name: "Đặc sản", icon: require("../assets/amthuc.jpg") },
-    { name: "Ăn nhẹ", icon: require("../assets/amthuc.jpg") },
+    { name: "Món mặn", icon: require("../assets/beef.jpg") },
+    { name: "Món nước", icon: require("../assets/burger.png") },
+    { name: "Món chay", icon: require("../assets/comtam.jpg") },
+    { name: "Tráng miệng", icon: require("../assets/coffee.jpg") },
+    { name: "Đặc sản", icon: require("../assets/drink.png") },
+    { name: "Ăn nhẹ", icon: require("../assets/pizza.png") },
     { name: "xem thêm..." },
   ];
 
@@ -73,6 +74,13 @@ export default function HomeScreen({ navigation }) {
       setLoading(false);
     })();
   }, []);
+
+  // Handle category selection from AllCategoriesScreen
+  useEffect(() => {
+    if (route.params?.selectedCategory) {
+      doSearch(route.params.selectedCategory);
+    }
+  }, [route.params?.selectedCategory]);
 
   const doSearch = async (text) => {
     if (!text) return;
@@ -109,6 +117,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleCategoryPress = (name) => {
+    setSelectedCategory(name);
     doSearch(name);
   };
 
@@ -122,7 +131,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#9a0e0eff" }}>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: "#9a0e0eff" }}>
       <Animated.View style={headerAnimatedStyle}>
         <HomeHeader
           initialQuery={query}
@@ -164,7 +173,7 @@ export default function HomeScreen({ navigation }) {
 
             <View style={styles.whiteSection}>
               {/* Category */}
-              <CategorySection categories={categories} onCategoryPress={handleCategoryPress} onViewAllPress={() => navigation.navigate('AllCategories', { categories, onCategoryPress: handleCategoryPress })} />
+              <CategorySection categories={categories} onCategoryPress={handleCategoryPress} selectedCategory={selectedCategory} onViewAllPress={() => navigation.navigate('AllCategories', { categories })} />
 
               {/* Map */}
               <MapSection userLoc={userLoc} shownPlaces={shownPlaces} mapRef={mapRef} onMarkerPress={(p) => navigation.navigate("RestaurantDetail", { item: p })} />

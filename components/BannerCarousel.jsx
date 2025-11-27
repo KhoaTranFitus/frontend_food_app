@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     width,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#9a0e0eff",
   },
   image: {
     borderRadius: 12,
