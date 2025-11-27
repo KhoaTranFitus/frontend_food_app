@@ -6,38 +6,32 @@ import * as Location from 'expo-location';
 import { getRoute } from '../services/tomtomApi.jsx';
 import { Ionicons } from '@expo/vector-icons';
 
-// Định nghĩa các biến màu sắc (Đồng bộ)
+// ⭐️ ĐỊNH NGHĨA MÀU SẮC MỚI (Đồng bộ với Home/Favorite) ⭐️
 const COLORS = {
-  BACKGROUND: '#8FD9FB',      
-  CARD_BACKGROUND: '#FFFFFF', 
-  BUTTON_BG: '#FFFFFF',       
-  BUTTON_TEXT: '#000000',     
+  BACKGROUND: '#9a0e0eff',      // Màu nền đỏ sẫm (giống Home Header)
+  CARD_BACKGROUND: '#FFFFFF', // Nền nội dung (Trắng)
   PRIMARY_TEXT: '#111111',    
   SECONDARY_TEXT: '#333333',  
-  BORDER: '#8FD9FB',          
-  ACCENT: '#006B8F',          
+  ACCENT: '#ff6347',          // Màu nhấn: Cam đỏ (giống Home/Favorite)
+  BORDER: '#EEEEEE',          // Viền nhạt
   STAR: '#FFC300',            
   FAV_RED: '#FF3B30',         
   FAV_GRAY: '#CCCCCC',        
 };
 
-// ⭐️ MẢNG MÀU SẮC AVATAR NGẪU NHIÊN (Placeholder) ⭐️
 const AVATAR_COLORS = ['#FF5733', '#33FF57', '#3357FF', '#FF33A1', '#33FFF6', '#A133FF'];
 
-// ⭐️ HÀM CHỌN MÀU NGẪU NHIÊN ⭐️
 const getRandomAvatarColor = () => {
   const index = Math.floor(Math.random() * AVATAR_COLORS.length);
   return AVATAR_COLORS[index];
 };
 
-// ⭐️ DỮ LIỆU MENU HÌNH ẢNH CHÍNH XÁC ⭐️
 const MENU_IMAGES = [
   { id: "1", name: "Beef Wellington", image: require("../assets/beef.jpg") },
   { id: "2", name: "Cơm Tấm", image: require("../assets/comtam.jpg") },
   { id: "3", name: "Bún Cá Cay", image: require("../assets/buncacay.jpg") }, 
   { id: "4", name: "Capuchino", image: require("../assets/coffee.jpg") },
 ];
-
 
 export default function RestaurantDetailScreen({ route, navigation }) {
   const { item } = route.params || {};
@@ -51,7 +45,6 @@ export default function RestaurantDetailScreen({ route, navigation }) {
   const [userComment, setUserComment] = useState(''); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
 
-  // Lấy vị trí người dùng
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -72,36 +65,16 @@ export default function RestaurantDetailScreen({ route, navigation }) {
       setIsFavorite(!isFavorite);
   };
 
+  const handleGoBack = () => {
+      navigation.goBack();
+  };
 
-  // Hàm chỉ đường
-  const handleNavigate = async () => {
-    if (!userLoc) {
-      Alert.alert('Đang lấy vị trí...');
-      return;
-    }
-    if (!item?.position?.lat || !item?.position?.lon) {
-      Alert.alert('Không có tọa độ điểm đến');
-      return;
-    }
-
-    setLoading(true);
-    const dest = {
-      latitude: item.position.lat,
-      longitude: item.position.lon,
-    };
-
-    try {
-      const coords = await getRoute(userLoc, dest);
-      setRouteCoords(coords);
-    } catch (error) {
-      console.error('Lỗi khi lấy route:', error);
-      Alert.alert('Lỗi', 'Không thể tìm đường đi.');
-    } finally {
-      setLoading(false);
-    }
+  // ⭐️ HÀM CHỈ ĐƯỜNG: CHUYỂN HƯỚNG TRỰC TIẾP ⭐️
+  const handleNavigate = () => {
+    // Không cần logic tính toán nữa, chỉ cần chuyển hướng
+    navigation.navigate('Map');
   };
   
-  // ⭐️ HÀM XỬ LÝ GỬI ĐÁNH GIÁ ⭐️
   const handleSubmitReview = async () => {
     if (userRating === 0) {
       Alert.alert('Lỗi', 'Vui lòng chọn số sao đánh giá.');
@@ -127,7 +100,6 @@ export default function RestaurantDetailScreen({ route, navigation }) {
     Alert.alert('Thành công', 'Đánh giá của bạn đã được gửi.');
   };
 
-  // Render Item cho Menu
   const renderMenuItem = ({ item }) => (
     <TouchableOpacity 
         style={styles.menuCard} 
@@ -138,19 +110,11 @@ export default function RestaurantDetailScreen({ route, navigation }) {
     </TouchableOpacity>
   );
 
-  // ⭐️ HÀM RENDER RATING ĐÃ ĐỒNG NHẤT ⭐️
   const renderRating = () => {
-    // Chuyển rating về dạng số (giả định max là 5 sao)
-    let ratingValue = 4; // Giá trị mặc định (placeholder 4 sao)
-    
+    let ratingValue = 4; 
     if (item?.rating) {
-        // Chuyển rating từ string/float sang số nguyên gần nhất (tối đa 5)
         ratingValue = Math.min(5, Math.max(0, Math.round(parseFloat(item.rating))));
-    } else {
-        // Nếu không có rating, dùng giá trị mặc định 4
-        ratingValue = 4;
-    }
-
+    } 
     return (
       <Text style={styles.ratingText}>
         <Text style={{ color: COLORS.STAR }}>
@@ -163,17 +127,17 @@ export default function RestaurantDetailScreen({ route, navigation }) {
     );
   };
 
-
   return (
     <SafeAreaView style={styles.container}>
+      {/* ⭐️ NÚT QUAY LẠI NỔI TRÊN ẢNH (Vị trí đã chỉnh) ⭐️ */}
+      <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={32} color={COLORS.ACCENT} />
+      </TouchableOpacity>
+
       <ScrollView>
-        {/* Header Image */}
         <Image source={item?.image || require('../assets/amthuc.jpg')} style={styles.headerImage} />
 
-        {/* Content */}
         <View style={styles.content}>
-          
-          {/* TÊN VÀ YÊU THÍCH */}
           <View style={styles.titleRow}>
             <Text style={styles.title}>{item?.name || 'Tên Nhà Hàng'}</Text>
             <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
@@ -186,23 +150,17 @@ export default function RestaurantDetailScreen({ route, navigation }) {
           </View>
           
           <View style={styles.infoRow}>
-            {/* ⭐️ SỬ DỤNG HÀM RENDER RATING ĐÃ ĐỒNG NHẤT ⭐️ */}
             {renderRating()}
             <Text style={styles.sub}> • Giờ mở cửa: 09:00 - 22:00</Text>
           </View>
 
           <Text style={styles.sub}>Địa chỉ: {item?.address || 'Địa chỉ không có'}</Text>
 
-          {/* Nút chỉ đường */}
-          <TouchableOpacity style={styles.cta} onPress={handleNavigate} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color={COLORS.CARD_BACKGROUND} />
-            ) : (
-              <Text style={styles.ctaText}>Chỉ đường</Text>
-            )}
+          <TouchableOpacity style={styles.cta} onPress={handleNavigate}>
+            <Text style={styles.ctaText}>Chỉ đường</Text>
           </TouchableOpacity>
 
-          {/* 🍽️ 1. PHẦN MENU MÓN ĂN */}
+          {/* MENU */}
           <View style={styles.menuSection}>
             <Text style={styles.menuHeader}>Menu</Text>
             <FlatList
@@ -216,7 +174,7 @@ export default function RestaurantDetailScreen({ route, navigation }) {
             />
           </View>
           
-          {/* 2. BẢN ĐỒ VỊ TRÍ */}
+          {/* BẢN ĐỒ */}
           <View style={styles.mapSection}>
             <Text style={styles.mapHeader}>Vị trí Nhà hàng</Text>
             <MapView
@@ -229,16 +187,10 @@ export default function RestaurantDetailScreen({ route, navigation }) {
                 longitudeDelta: 0.05,
               }}
             >
-              {/* Marker vị trí người dùng */}
+              {/* Giữ nguyên Marker nhưng loại bỏ logic loading/routing */}
               {userLoc && (
-                <Marker
-                  coordinate={userLoc}
-                  title="Vị trí của bạn"
-                  pinColor="blue"
-                />
+                <Marker coordinate={userLoc} title="Vị trí của bạn" pinColor="blue" />
               )}
-
-              {/* Marker nhà hàng */}
               {item?.position && (
                 <Marker
                   coordinate={{
@@ -250,19 +202,16 @@ export default function RestaurantDetailScreen({ route, navigation }) {
                   pinColor="red"
                 />
               )}
-
-              {/* Đường đi */}
               {routeCoords.length > 0 && (
                 <Polyline coordinates={routeCoords} strokeWidth={5} strokeColor={COLORS.ACCENT} />
               )}
             </MapView>
           </View>
 
-          {/* 3. PHẦN ĐÁNH GIÁ (REVIEW) */}
+          {/* ĐÁNH GIÁ */}
           <View style={styles.reviewSection}>
             <Text style={styles.reviewHeader}>Đánh giá của khách hàng</Text>
             
-            {/* Form Đánh giá */}
             <View style={styles.ratingForm}>
               <Text style={styles.formLabel}>Số sao:</Text>
               <View style={styles.starContainer}>
@@ -303,30 +252,23 @@ export default function RestaurantDetailScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Danh sách Đánh giá */}
             <Text style={styles.reviewHeader}>Tất cả Đánh giá ({reviews.length})</Text>
             {reviews.length === 0 ? (
               <Text style={styles.noReviews}>Chưa có đánh giá nào. Hãy là người đầu tiên!</Text>
             ) : (
               reviews.map((review) => (
                 <View key={review.id} style={styles.reviewItem}>
-                  
-                  {/* KHU VỰC AVATAR VÀ TÊN NGƯỜI DÙNG */}
                   <View style={styles.userHeader}>
-                      {/* AVATAR PLACEHOLDER */}
                       <View style={[
                           styles.avatar, 
                           { backgroundColor: review.avatarColor || '#CCCCCC' } 
                       ]}>
                           <Text style={styles.avatarText}>{review.username[0]}</Text>
                       </View>
-                      
-                      {/* TÊN VÀ NGÀY */}
                       <Text style={styles.reviewUser}>
                           {review.username} - {review.date}
                       </Text>
                   </View>
-                  
                   <Text style={styles.reviewRating}>
                     <Text style={{ color: COLORS.STAR }}>
                       {Array(review.rating).fill('★').join('')}
@@ -352,6 +294,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.BACKGROUND,
   },
+  backButton: {
+    position: 'absolute',
+    top: 55, 
+    left: 20, 
+    zIndex: 10,
+  },
   headerImage: { width: '100%', height: 220 },
   content: {
     padding: 16,
@@ -370,23 +318,19 @@ const styles = StyleSheet.create({
   favoriteButton: {
     padding: 5,
   },
-  
-  // SỬA CẤU TRÚC VÀO INFO ROW
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
-    flexWrap: 'wrap', // Cho phép xuống dòng nếu quá dài
+    flexWrap: 'wrap',
   },
   ratingText: {
-    // Để rating ở đây, không có margin bottom
   },
   sub: { 
     color: COLORS.SECONDARY_TEXT, 
     marginTop: 6,
-    marginLeft: 5, // Khoảng cách giữa rating và giờ mở cửa
+    marginLeft: 5, 
   },
-  
   cta: {
     marginTop: 16,
     backgroundColor: COLORS.ACCENT,
@@ -399,8 +343,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  
-  // Menu styles
   menuSection: {
     marginTop: 20,
     paddingVertical: 10,
@@ -437,8 +379,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.PRIMARY_TEXT,
   },
-
-  // Map styles
   mapSection: {
     marginTop: 20,
     paddingVertical: 10,
@@ -457,8 +397,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
   },
-
-  // STYLES ĐÁNH GIÁ 
   reviewSection: {
     marginTop: 20,
     paddingVertical: 10,
@@ -470,7 +408,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.PRIMARY_TEXT,
     marginBottom: 10,
-    marginTop: 10,
   },
   ratingForm: {
     marginBottom: 20,
@@ -508,8 +445,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     backgroundColor: COLORS.ACCENT, 
     padding: 12,
-    alignItems: 'center',
     borderRadius: 12,
+    alignItems: 'center',
   },
   submitText: {
     color: COLORS.CARD_BACKGROUND,
@@ -523,8 +460,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#EEEEEE', 
   },
-  
-  // STYLES CHO AVATAR VÀ USER HEADER
   userHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -547,8 +482,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.ACCENT,
   },
-
-  // SỬA REVIEW ITEM ALIGNMENT
   reviewRating: {
     fontSize: 20,
     marginBottom: 4,

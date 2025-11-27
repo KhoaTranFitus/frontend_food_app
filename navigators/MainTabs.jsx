@@ -1,9 +1,11 @@
+// navigators/MainTabs.jsx
+
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import AnimatedIcon from "../components/AnimatedIcon";
 
 import HomeStackNavigator from "./HomeStackNavigator";
-import FavoriteScreen from "../screens/FavoriteScreen";
+import FavoriteStackNavigator from "./FavoriteStackNavigator"; // ⭐️ IMPORT MỚI ⭐️
 import MapScreen from "../screens/MapScreen";
 import ChatBotScreen from "../screens/ChatBotScreen";
 import ProfileStackNavigator from "./ProfileStackNavigator";
@@ -24,8 +26,9 @@ export default function MainTabs() {
         },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
+          // Lưu ý: route.name phải khớp với tên Tab.Screen bên dưới
           if (route.name === "HomeStack") iconName = focused ? "home" : "home-outline";
-          else if (route.name === "Favorite") iconName = focused ? "heart" : "heart-outline";
+          else if (route.name === "FavoriteStack") iconName = focused ? "heart" : "heart-outline"; // Đổi tên route check
           else if (route.name === "Map") iconName = focused ? "map" : "map-outline";
           else if (route.name === "ChatBot") iconName = focused ? "chatbubbles" : "chatbubbles-outline";
           else if (route.name === "ProfileStack") iconName = focused ? "person" : "person-outline";
@@ -41,7 +44,9 @@ export default function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Favorite" component={FavoriteScreen} />
+      {/* ⭐️ ĐỔI component thành FavoriteStackNavigator và đặt tên là FavoriteStack ⭐️ */}
+      <Tab.Screen name="FavoriteStack" component={FavoriteStackNavigator} />
+      
       <Tab.Screen name="Map" component={MapScreen} />
       <Tab.Screen name="HomeStack" component={HomeStackNavigator} />
       <Tab.Screen name="ChatBot" component={ChatBotScreen} />
