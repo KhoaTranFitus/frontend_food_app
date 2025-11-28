@@ -63,7 +63,7 @@ export default function AboutAppScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7BE27",
+    backgroundColor: "#9a0e0eff",
     paddingTop: 20,
   },
 

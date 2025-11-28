@@ -127,7 +127,9 @@ export default function ProfileScreen() {
           <Text style={styles.email}>{profile.email}</Text>
           
           {/* Nút Edit Profile (Giữ nguyên vị trí) */}
-          <TouchableOpacity style={styles.editButton}>
+          <TouchableOpacity
+            style={styles.editButton}
+              onPress={() => navigation.navigate("EditProfile")}>
             <Ionicons name="pencil-outline" size={16} color="#000" />
             <Text style={styles.editButtonText}>Edit profile</Text>
           </TouchableOpacity>
@@ -140,7 +142,10 @@ export default function ProfileScreen() {
         <View style={styles.optionBox}>
           {/* Saved Dishes */}
         
-          <TouchableOpacity style={styles.optionCard}>
+          <TouchableOpacity
+            style={styles.optionCard}
+            onPress={() => navigation.navigate("SavedDishes")}
+          >
             <View style={styles.optionLeft}>
               <Feather name="bookmark" size={22} color="#000" />
               <Text style={styles.optionText}>Saved Dishes</Text>
@@ -148,7 +153,10 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           {/* Help & Support */}
-          <TouchableOpacity style={styles.optionCard}>
+          <TouchableOpacity
+            style={styles.optionCard}
+            onPress={() => navigation.navigate("HelpSupport")}
+          >
             <View style={styles.optionLeft}>
               <Ionicons name="help-circle-outline" size={22} color="#000" />
               <Text style={styles.optionText}>Help & Support</Text>
@@ -183,7 +191,13 @@ export default function ProfileScreen() {
 
           {/* Danh sách các mục trong Settings */}
           <View style={modalStyles.settingsList}>
-            <TouchableOpacity style={modalStyles.settingItem}>
+            <TouchableOpacity
+              style={modalStyles.settingItem}
+              onPress={() => {
+              setShowSettingsModal(false);
+              navigation.navigate("ChangePassword", { email: profile.email });
+              }}
+            >
               <View style={modalStyles.settingLeft}>
                 <Ionicons name="lock-closed-outline" size={22} color="#000" />
                 <Text style={modalStyles.settingText}>Change Password</Text>
@@ -199,7 +213,13 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward-outline" size={20} color="#000" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={modalStyles.settingItem}>
+            <TouchableOpacity
+              style={modalStyles.settingItem}
+              onPress={() => {
+                setShowSettingsModal(false);
+                navigation.navigate("Notifications");
+              }}
+            >
               <View style={modalStyles.settingLeft}>
                 <Ionicons name="notifications-outline" size={22} color="#000" />
                 <Text style={modalStyles.settingText}>Notifications</Text>
@@ -233,7 +253,7 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    backgroundColor: "#F7BE27",
+    backgroundColor: "#9a0e0eff",
     
   },
   
@@ -327,11 +347,11 @@ const styles = StyleSheet.create({
   moreOptionsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#000',
+    color: '#ffffffff',
     alignSelf: 'flex-start',
     marginBottom: 15, 
     marginTop: 8,
-    paddingHorizontal: 0,
+    paddingHorizontal: 5,
   },
 
  optionCard: {
