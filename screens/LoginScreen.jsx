@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,11 +7,14 @@ import {
   StyleSheet,
   ImageBackground,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
+import { authAPI } from '../services/flaskApi';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
@@ -20,12 +23,30 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      alert("Vui lòng nhập email và password");
+      return;
+    }
+
+    setLoading(true);
     try {
-      await login();
+      const result = await authAPI.login(email, password);
+      console.log('Login success:', result);
+      
+      // Gọi login từ AuthContext để update state
+      // Token đã được lưu bởi interceptor
+      if (login) {
+        await login();
+      }
+      // Navigation sẽ tự động xảy ra từ AppNavigator khi isLoggedIn = true
     } catch (error) {
-      console.log("Login error:", error);
+      console.error('Login error:', error);
+      alert(error.error || error.message || 'Đăng nhập thất bại');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,8 +111,16 @@ export default function LoginScreen() {
             <Text style={styles.forgot}>Forgot password?</Text>
           </TouchableOpacity>
           {/* LOGIN BUTTON */}
-          <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-            <Text style={styles.loginText}>LOGIN</Text>
+          <TouchableOpacity 
+            style={[styles.loginBtn, loading && { opacity: 0.6 }]} 
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginText}>LOGIN</Text>
+            )}
           </TouchableOpacity>
 
           {/* REGISTER LINK */}

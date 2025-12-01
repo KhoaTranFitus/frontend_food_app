@@ -7,17 +7,58 @@ import {
   StyleSheet,
   ImageBackground,
   Image,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { authAPI } from '../services/flaskApi';
 
 export default function RegisterScreen() {
   const navigation = useNavigation();
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [visiblePassword, setVisiblePassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleRegister = async () => {
+    if (!name || !email || !password || !confirmPassword) {
+      Alert.alert("Lỗi", "Vui lòng điền đầy đủ các trường.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp.");
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authAPI.register(email, password, name);
+      Alert.alert("Thành công", "Đăng ký thành công! Vui lòng xác thực email.", [
+        {
+          text: "Xác thực",
+          onPress: () => navigation.navigate("Verify", { email, mode: "register" }),
+        },
+      ]);
+      setName("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      Alert.alert("Lỗi", error.error || "Đăng ký thất bại");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -37,6 +78,8 @@ export default function RegisterScreen() {
               placeholder="Name"
               placeholderTextColor="#999"
               style={styles.input}
+              value={name}
+              onChangeText={setName}
             />
           </View>
 
@@ -47,8 +90,10 @@ export default function RegisterScreen() {
               placeholder="Email"
               placeholderTextColor="#999"
               style={styles.input}
-              value={email}        // luu gia tri nguoi dung nhap vao email
+              value={email}
               onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
           </View>
 
@@ -60,6 +105,8 @@ export default function RegisterScreen() {
               placeholderTextColor="#999"
               secureTextEntry={!visiblePassword}
               style={styles.input}
+              value={password}
+              onChangeText={setPassword}
             />
             <TouchableOpacity
               onPress={() => setVisiblePassword(!visiblePassword)}
@@ -80,6 +127,8 @@ export default function RegisterScreen() {
               placeholderTextColor="#999"
               secureTextEntry={!showConfirmPassword}
               style={styles.input}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
             />
             <TouchableOpacity
               onPress={() =>
@@ -96,13 +145,15 @@ export default function RegisterScreen() {
 
           {/* SIGN UP BUTTON */}
           <TouchableOpacity
-            style={styles.signUpBtn}
-            onPress={() => navigation.navigate("Verify", {
-              email,
-              mode: "register"
-            })}
+            style={[styles.signUpBtn, loading && { opacity: 0.6 }]}
+            onPress={handleRegister}
+            disabled={loading}
           >
-            <Text style={styles.signUpText}>SIGN UP</Text>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.signUpText}>SIGN UP</Text>
+            )}
           </TouchableOpacity>
 
           {/* LOGIN LINK */}

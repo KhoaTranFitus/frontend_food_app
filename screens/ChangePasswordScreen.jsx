@@ -1,53 +1,88 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import { authAPI } from "../services/flaskApi";
 
-export default function ChangePassWordScreen() {
-    const navigation = useNavigation();
-    const route = useRoute();
+export default function ChangePasswordScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
 
-    const { email } = route.params ?? {};
+  const { email } = route.params ?? {};
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-    const [pass, setPass] = useState("");
-    const [confirmPass, setConfirmPass] = useState("");
+  const handleChange = async () => {
+    if (!newPassword || !confirmPassword) {
+      Alert.alert("Lỗi", "Vui lòng điền đầy đủ mật khẩu");
+      return;
+    }
 
-    const handleChange = () => {
-        if (pass !== confirmPass) {
-            alert("Passwords do not match!");
-            return;
-        }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Lỗi", "Mật khẩu không khớp!");
+      return;
+    }
 
-        console.log("Email:", email);
-        console.log("New Password:", pass);
+    if (newPassword.length < 6) {
+      Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự");
+      return;
+    }
 
-        alert("Password changed successfully!");
-        navigation.navigate("Login");
-    };
+    setLoading(true);
+    try {
+      // Dùng resetPassword khi quên mật khẩu (có email)
+      const result = await authAPI.resetPassword(email, newPassword);
+      Alert.alert("Thành công", "Đổi mật khẩu thành công!", [
+        { text: "Đăng nhập", onPress: () => navigation.navigate("Login") },
+      ]);
+    } catch (error) {
+      Alert.alert("Lỗi", error.error || "Không thể đổi mật khẩu");
+    } finally {
+      setLoading(false);
+    }
+  };
 
     return (
         <SafeAreaView style={styles.container}>
-            <Text style={styles.title}>Change Password</Text>
-            <Text style={styles.email}>{email}</Text>
+            <Text style={styles.title}>Đặt lại mật khẩu</Text>
 
             <TextInput
                 style={styles.input}
-                placeholder="New password"
+                placeholder="Mật khẩu mới"
+                placeholderTextColor="#999"
                 secureTextEntry
-                value={pass}
-                onChangeText={setPass}
+                value={newPassword}
+                onChangeText={setNewPassword}
             />
 
             <TextInput
                 style={styles.input}
-                placeholder="Confirm password"
+                placeholder="Xác nhận mật khẩu"
+                placeholderTextColor="#999"
                 secureTextEntry
-                value={confirmPass}
-                onChangeText={setConfirmPass}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
             />
 
-            <TouchableOpacity style={styles.btn} onPress={handleChange}>
-                <Text style={styles.btnText}>CHANGE PASSWORD</Text>
+            <TouchableOpacity
+                style={[styles.btn, loading && { opacity: 0.6 }]}
+                onPress={handleChange}
+                disabled={loading}
+            >
+                {loading ? (
+                    <ActivityIndicator color="#fff" />
+                ) : (
+                    <Text style={styles.btnText}>LƯU MẬT KHẨU</Text>
+                )}
             </TouchableOpacity>
         </SafeAreaView>
     );

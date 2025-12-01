@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { chatbotAPI } from '../services/flaskApi';
 
 export default function ChatBotScreen() {
   const [messages, setMessages] = useState([
@@ -16,7 +17,8 @@ export default function ChatBotScreen() {
     { id: 4, emoji: '🍚', text: 'Quán cơm gần Hcmus', query: 'Quán cơm ngon nhất' },
   ];
 
-  const handleSendMessage = (query = input) => {
+  // Gửi tin nhắn
+  const handleSendMessage = async (query = input) => {
     if (!query.trim()) return;
 
     // Add user message
@@ -28,15 +30,13 @@ export default function ChatBotScreen() {
     setMessages([...messages, userMessage]);
     setInput('');
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = {
-        id: messages.length + 2,
-        text: `Tuyệt vời! Tôi đang tìm kiếm các nhà hàng phù hợp với "${query}" gần bro. Kết quả sẽ xuất hiện ngay dưới! `,
-        isBot: true,
-      };
-      setMessages(prev => [...prev, botResponse]);
-    }, 500);
+    try {
+      const response = await chatbotAPI.sendMessage(query);
+      // Thêm tin nhắn bot vào history
+      setMessages(prev => [...prev, response]);
+    } catch (error) {
+      console.error('Error:', error.error);
+    }
   };
 
   const renderMessage = ({ item }) => (
