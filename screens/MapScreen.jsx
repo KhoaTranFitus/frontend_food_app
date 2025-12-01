@@ -18,7 +18,7 @@ const SAMPLE_PLACES = [
   { id: 's6', name: 'Quán Ăn Mẫu 6 - Hải Sản', address: 'Đường F', position: { lat: 10.7755, lon: 106.7005 }, dishType: 'seafood' },
 ];
 
-export default function MapScreen({ navigation }) {
+export default function MapScreen({ navigation, route }) {
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
@@ -182,6 +182,69 @@ export default function MapScreen({ navigation }) {
     })();
   }, []);
 
+  // Handle destination from route params (when navigating from other screens)
+  useEffect(() => {
+    if (route.params?.selectedPlace && userLocation) {
+      const selectedPlace = route.params.selectedPlace;
+      
+      // Debug: Log the structure of selectedPlace
+      console.log('selectedPlace received:', JSON.stringify(selectedPlace, null, 2));
+
+      // Safe coordinate extraction with multiple fallback checks
+      let latitude = null;
+      let longitude = null;
+
+      // Try different possible coordinate structures
+      if (selectedPlace.position?.lat !== undefined && selectedPlace.position?.lon !== undefined) {
+        // Structure: {position: {lat, lon}}
+        latitude = selectedPlace.position.lat;
+        longitude = selectedPlace.position.lon;
+        console.log('Extracted from position.lat/lon:', { latitude, longitude });
+      } else if (selectedPlace.latitude !== undefined && selectedPlace.longitude !== undefined) {
+        // Structure: {latitude, longitude} (flat)
+        latitude = selectedPlace.latitude;
+        longitude = selectedPlace.longitude;
+        console.log('Extracted from flat latitude/longitude:', { latitude, longitude });
+      } else if (selectedPlace.lat !== undefined && selectedPlace.lon !== undefined) {
+        // Structure: {lat, lon} (flat alternate)
+        latitude = selectedPlace.lat;
+        longitude = selectedPlace.lon;
+        console.log('Extracted from flat lat/lon:', { latitude, longitude });
+      } else {
+        // Invalid data
+        console.error('Invalid selectedPlace structure - missing coordinates:', selectedPlace);
+        Alert.alert('Lỗi dữ liệu', 'Không thể xác định tọa độ của địa điểm. Vui lòng thử lại.');
+        navigation.setParams({ selectedPlace: undefined });
+        return;
+      }
+
+      // Validate coordinates are valid numbers
+      if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
+          isNaN(latitude) || isNaN(longitude)) {
+        console.error('Invalid coordinate values:', { latitude, longitude });
+        Alert.alert('Lỗi dữ liệu', 'Tọa độ không hợp lệ. Vui lòng thử lại.');
+        navigation.setParams({ selectedPlace: undefined });
+        return;
+      }
+
+      const endLocation = {
+        latitude: latitude,
+        longitude: longitude,
+      };
+
+      console.log('Final endLocation:', endLocation);
+
+      // Set destination
+      setDestination(endLocation);
+
+      // Immediately fetch route with current userLocation and new destination
+      fetchRoute(userLocation, endLocation);
+
+      // Clear route params to prevent loop
+      navigation.setParams({ selectedPlace: undefined });
+    }
+  }, [route.params?.selectedPlace, userLocation]);
+
   // 🔍 Tìm kiếm địa điểm bằng TomTom Search API
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -215,24 +278,27 @@ export default function MapScreen({ navigation }) {
     }
   };
 
-  // 🧭 Lấy chỉ đường bằng TomTom Routing API
-  const handleRoute = async () => {
-    if (!userLocation || !destination) {
+  // 🧭 Function to fetch route from TomTom with direct coordinates (not dependent on state)
+  const fetchRoute = async (startLocation, endLocation) => {
+    if (!startLocation || !endLocation) {
       Alert.alert('Vui lòng bật định vị và chọn điểm đến trước');
       return;
     }
 
     // Kiểm tra trùng tọa độ
-    if (Math.abs(userLocation.latitude - destination.latitude) < 0.0001 &&
-        Math.abs(userLocation.longitude - destination.longitude) < 0.0001) {
+    if (Math.abs(startLocation.latitude - endLocation.latitude) < 0.0001 &&
+        Math.abs(startLocation.longitude - endLocation.longitude) < 0.0001) {
       Alert.alert('Vị trí hiện tại và điểm đến quá gần — không thể tạo tuyến đường.');
       return;
     }
 
     try {
-      const url = `https://api.tomtom.com/routing/1/calculateRoute/${userLocation.longitude},${userLocation.latitude}:${destination.longitude},${destination.latitude}/json?key=${TOMTOM_API_KEY}`;
+      // TomTom format: latitude,longitude (not longitude,latitude)
+      const url = `https://api.tomtom.com/routing/1/calculateRoute/${startLocation.latitude},${startLocation.longitude}:${endLocation.latitude},${endLocation.longitude}/json?key=${TOMTOM_API_KEY}`;
 
       console.log('TomTom route URL:', url);
+      console.log('Start:', { lat: startLocation.latitude, lon: startLocation.longitude });
+      console.log('Destination:', { lat: endLocation.latitude, lon: endLocation.longitude });
 
       const res = await axios.get(url);
 
@@ -247,14 +313,48 @@ export default function MapScreen({ navigation }) {
         longitude: p.longitude,
       }));
 
+      console.log('Route points count:', points.length);
+      console.log('First point:', points[0]);
+      console.log('Last point:', points[points.length - 1]);
+
       setRouteCoords(points);
+
+      // Auto-fit map to show entire route with padding
+      if (mapRef.current && points.length > 0) {
+        mapRef.current.fitToCoordinates(points, {
+          edgePadding: {
+            top: 100,    // Padding to avoid search bar
+            right: 50,
+            bottom: 50,
+            left: 50,
+          },
+          animated: true,
+        });
+      }
     } catch (err) {
-      console.error('TomTom route error:', err.response?.data || err.message);
+      console.error('TomTom route error details:', {
+        message: err.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        statusText: err.response?.statusText,
+      });
       Alert.alert(
         'Không thể lấy chỉ đường',
         err.response?.data?.error?.description || err.message
       );
     }
+  };
+
+  // 🧭 Wrapper function that uses state values
+  const handleRoute = async () => {
+    await fetchRoute(userLocation, destination);
+  };
+
+  // Clear route and reset to default state
+  const clearRoute = () => {
+    setRouteCoords([]);
+    setDestination(null);
+    setQuery('');
   };
 
   // Handle restaurant marker callout press - navigate to RestaurantDetail
@@ -316,7 +416,7 @@ export default function MapScreen({ navigation }) {
           })}
            
            {routeCoords.length > 0 && (
-             <Polyline coordinates={routeCoords} strokeWidth={4} strokeColor="blue" />
+             <Polyline coordinates={routeCoords} strokeWidth={6} strokeColor="#007AFF" lineDashPattern={[0]} />
            )}
          </MapView>
        ) : (
@@ -333,7 +433,11 @@ export default function MapScreen({ navigation }) {
            onChangeText={setQuery}
          />
          <Button title="Tìm" onPress={handleSearch} />
-         <Button title="Chỉ đường" onPress={handleRoute} />
+         {routeCoords.length > 0 ? (
+           <Button title="Hủy" onPress={clearRoute} color="#FF3B30" />
+         ) : (
+           <Button title="Chỉ đường" onPress={handleRoute} />
+         )}
        </View>
       {/* Hamburger menu, giờ nằm dưới search bar và align trái với searchContainer */}
       <TouchableOpacity style={[styles.hamburger, { top: hamburgerTop, left: searchLeft }]} onPress={openMenu}>

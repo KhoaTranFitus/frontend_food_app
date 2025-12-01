@@ -1,9 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TextInput, FlatList } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet, Alert, TextInput, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Polyline } from 'react-native-maps';
-import * as Location from 'expo-location';
-import { getRoute } from '../services/tomtomApi.jsx';
 import { Ionicons } from '@expo/vector-icons';
 
 // Định nghĩa các biến màu sắc (Đồng bộ)
@@ -41,64 +38,39 @@ const MENU_IMAGES = [
 
 export default function RestaurantDetailScreen({ route, navigation }) {
   const { item } = route.params || {};
-  const [userLoc, setUserLoc] = useState(null);
-  const [routeCoords, setRouteCoords] = useState([]);
-  const [loading, setLoading] = useState(false);
-  
   const [isFavorite, setIsFavorite] = useState(false); 
   const [reviews, setReviews] = useState([]); 
   const [userRating, setUserRating] = useState(0); 
   const [userComment, setUserComment] = useState(''); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
 
-  // Lấy vị trí người dùng
-  useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        return;
-      }
-      let loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Highest,
-      });
-      setUserLoc({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-    })();
-  }, []);
-
   const handleToggleFavorite = () => {
       setIsFavorite(!isFavorite);
   };
 
 
-  // Hàm chỉ đường
-  const handleNavigate = async () => {
-    if (!userLoc) {
-      Alert.alert('Đang lấy vị trí...');
-      return;
-    }
-    if (!item?.position?.lat || !item?.position?.lon) {
-      Alert.alert('Không có tọa độ điểm đến');
+  // Hàm chỉ đường - điều hướng tới MapScreen với dữ liệu chuẩn hóa
+  const handleNavigate = () => {
+    if (!item?.position) {
+      Alert.alert('Lỗi', 'Không có tọa độ điểm đến');
       return;
     }
 
-    setLoading(true);
-    const dest = {
-      latitude: item.position.lat,
-      longitude: item.position.lon,
+    // Chuẩn hóa dữ liệu: chuyển từ .lat/.lon sang latitude/longitude (flat structure)
+    const selectedPlace = {
+      latitude: item.position.lat,      // Convert từ .lat nếu cần
+      longitude: item.position.lon,     // Convert từ .lon nếu cần
+      name: item.name,                  // Thêm tên quán để debug
     };
 
-    try {
-      const coords = await getRoute(userLoc, dest);
-      setRouteCoords(coords);
-    } catch (error) {
-      console.error('Lỗi khi lấy route:', error);
-      Alert.alert('Lỗi', 'Không thể tìm đường đi.');
-    } finally {
-      setLoading(false);
-    }
+    console.log('Navigating to Map with selectedPlace:', JSON.stringify(selectedPlace, null, 2));
+
+    // Điều hướng tới MapScreen với merge: true để không reload màn hình
+    navigation.navigate({
+      name: 'Map',
+      params: { selectedPlace },
+      merge: true,
+    });
   };
   
   // ⭐️ HÀM XỬ LÝ GỬI ĐÁNH GIÁ ⭐️
@@ -194,12 +166,8 @@ export default function RestaurantDetailScreen({ route, navigation }) {
           <Text style={styles.sub}>Địa chỉ: {item?.address || 'Địa chỉ không có'}</Text>
 
           {/* Nút chỉ đường */}
-          <TouchableOpacity style={styles.cta} onPress={handleNavigate} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator color={COLORS.CARD_BACKGROUND} />
-            ) : (
-              <Text style={styles.ctaText}>Chỉ đường</Text>
-            )}
+          <TouchableOpacity style={styles.cta} onPress={handleNavigate}>
+            <Text style={styles.ctaText}>Chỉ đường</Text>
           </TouchableOpacity>
 
           {/* 🍽️ 1. PHẦN MENU MÓN ĂN */}
@@ -216,48 +184,6 @@ export default function RestaurantDetailScreen({ route, navigation }) {
             />
           </View>
           
-          {/* 2. BẢN ĐỒ VỊ TRÍ */}
-          <View style={styles.mapSection}>
-            <Text style={styles.mapHeader}>Vị trí Nhà hàng</Text>
-            <MapView
-              style={styles.map}
-              provider="google"
-              initialRegion={{
-                latitude: item?.position?.lat || 10.77653,
-                longitude: item?.position?.lon || 106.700981,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-            >
-              {/* Marker vị trí người dùng */}
-              {userLoc && (
-                <Marker
-                  coordinate={userLoc}
-                  title="Vị trí của bạn"
-                  pinColor="blue"
-                />
-              )}
-
-              {/* Marker nhà hàng */}
-              {item?.position && (
-                <Marker
-                  coordinate={{
-                    latitude: item.position.lat,
-                    longitude: item.position.lon,
-                  }}
-                  title={item?.name}
-                  description={item?.address}
-                  pinColor="red"
-                />
-              )}
-
-              {/* Đường đi */}
-              {routeCoords.length > 0 && (
-                <Polyline coordinates={routeCoords} strokeWidth={5} strokeColor={COLORS.ACCENT} />
-              )}
-            </MapView>
-          </View>
-
           {/* 3. PHẦN ĐÁNH GIÁ (REVIEW) */}
           <View style={styles.reviewSection}>
             <Text style={styles.reviewHeader}>Đánh giá của khách hàng</Text>
@@ -436,26 +362,6 @@ const styles = StyleSheet.create({
   menuFoodName: {
     fontWeight: '600',
     color: COLORS.PRIMARY_TEXT,
-  },
-
-  // Map styles
-  mapSection: {
-    marginTop: 20,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-  },
-  mapHeader: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.PRIMARY_TEXT,
-    marginBottom: 10,
-  },
-  map: {
-    width: '100%',
-    height: 300,
-    borderRadius: 10,
-    overflow: 'hidden',
   },
 
   // STYLES ĐÁNH GIÁ 
