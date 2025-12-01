@@ -1,74 +1,67 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import {
+    View, Text, TextInput, TouchableOpacity,
+    StyleSheet, Alert
+} from "react-native";
+import axios from "axios";
+import { useRoute, useNavigation } from "@react-navigation/native";
 
-export default function ChangePassWordScreen() {
-    const navigation = useNavigation();
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+export default function ChangePasswordScreen() {
     const route = useRoute();
+    const navigation = useNavigation();
 
-    const { email } = route.params ?? {};
+    const { email } = route.params;
+    const [newPass, setNewPass] = useState("");
 
-    const [pass, setPass] = useState("");
-    const [confirmPass, setConfirmPass] = useState("");
-
-    const handleChange = () => {
-        if (pass !== confirmPass) {
-            alert("Passwords do not match!");
+    const handleSave = async () => {
+        if (!newPass) {
+            Alert.alert("Lỗi", "Vui lòng nhập mật khẩu mới");
             return;
         }
 
-        console.log("Email:", email);
-        console.log("New Password:", pass);
+        try {
+            await axios.post(`${API_BASE_URL}/change-password`, {
+                email,
+                new_password: newPass
+            });
 
-        alert("Password changed successfully!");
-        navigation.navigate("Login");
+            Alert.alert("Thành công", "Đổi mật khẩu thành công!", [
+                { text: "Đăng nhập", onPress: () => navigation.navigate("Login") }
+            ]);
+        } catch (error) {
+            Alert.alert("Lỗi", error.response?.data?.error || "Không thể đổi mật khẩu");
+        }
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Text style={styles.title}>Change Password</Text>
-            <Text style={styles.email}>{email}</Text>
-
+        <View style={styles.container}>
+            <Text style={styles.title}>Đặt lại mật khẩu</Text>
             <TextInput
-                style={styles.input}
-                placeholder="New password"
+                placeholder="Mật khẩu mới"
                 secureTextEntry
-                value={pass}
-                onChangeText={setPass}
-            />
-
-            <TextInput
                 style={styles.input}
-                placeholder="Confirm password"
-                secureTextEntry
-                value={confirmPass}
-                onChangeText={setConfirmPass}
+                value={newPass}
+                onChangeText={setNewPass}
             />
-
-            <TouchableOpacity style={styles.btn} onPress={handleChange}>
-                <Text style={styles.btnText}>CHANGE PASSWORD</Text>
+            <TouchableOpacity style={styles.btn} onPress={handleSave}>
+                <Text style={styles.btnText}>LƯU MẬT KHẨU</Text>
             </TouchableOpacity>
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: "center", padding: 25 },
-    title: { fontSize: 26, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
-    email: { textAlign: "center", marginBottom: 20, color: "#555" },
+    container: { flex: 1, padding: 25, justifyContent: "center" },
+    title: { fontSize: 24, fontWeight: "bold", textAlign: "center" },
     input: {
-        borderWidth: 1,
-        borderColor: "#ddd",
-        padding: 12,
-        borderRadius: 10,
-        marginBottom: 15,
+        borderWidth: 1, borderColor: "#ccc",
+        padding: 12, borderRadius: 8, marginTop: 20
     },
     btn: {
-        backgroundColor: "#F9A825",
-        padding: 14,
-        borderRadius: 10,
-        alignItems: "center",
+        backgroundColor: "#F9A825", padding: 15,
+        borderRadius: 10, marginTop: 20, alignItems: "center"
     },
-    btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+    btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 }
 });

@@ -12,20 +12,57 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// const API_BASE_URL = 'http://192.168.1.12:5000/api';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export default function LoginScreen() {
   const navigation = useNavigation();
   const { login } = useAuth();
-
   const [email, setEmail] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  // const handleLogin = async () => {
+  //   try {
+  //     await login();
+  //   } catch (error) {
+  //     console.log("Login error:", error);
+  //   }
+  // };
 
   const handleLogin = async () => {
+    setError(""); // Reset lỗi trước khi thử đăng nhập
+
+    if (!email || !password) {
+      setError("Vui lòng điền đầy đủ email và mật khẩu.");
+      return;
+    }
+
     try {
-      await login();
-    } catch (error) {
-      console.log("Login error:", error);
+      // ⭐️ GỌI API LOGIN ĐẾN BACKEND ⭐️
+      console.log("Calling API at:", `${API_BASE_URL}/login`);
+      const response = await axios.post(`${API_BASE_URL}/login`, {
+        email: email,
+        password: password,
+      });
+
+      // Nếu API trả về thành công (status 200)
+      if (response.data && response.data.idToken) {
+        // Lưu ID Token vào AsyncStorage hoặc Context nếu cần
+        await AsyncStorage.setItem("userToken", response.data.idToken);
+        // Gọi hàm login từ AuthContext để cập nhật trạng thái
+        await login();
+        // Ứng dụng sẽ tự động chuyển hướng qua MainTabs
+      }
+    } catch (apiError) {
+      // Xử lý lỗi từ Backend (ví dụ: 400, 401, 403, 404)
+      const errorMessage = apiError.response?.data?.error || "Đăng nhập thất bại. Lỗi kết nối.";
+      setError(errorMessage);
+      console.log("Login API Error:", errorMessage);
     }
   };
 
@@ -82,14 +119,15 @@ export default function LoginScreen() {
               }
 
               navigation.navigate("Verify", {
-                mode: "reset_password",
                 email: email,
+                mode: "reset_password",
               });
             }}
           >
             <Text style={styles.forgot}>Forgot password?</Text>
           </TouchableOpacity>
           {/* LOGIN BUTTON */}
+          {error ? <Text style={{ color: 'red', textAlign: 'center', marginBottom: 5, marginTop: 15 }}>{error}</Text> : null}
           <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
             <Text style={styles.loginText}>LOGIN</Text>
           </TouchableOpacity>
