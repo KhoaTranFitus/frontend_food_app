@@ -1,68 +1,127 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Animated, Dimensions, Pressable, ScrollView } from 'react-native';
+import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Animated, Dimensions, ScrollView } from 'react-native';
 import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as Location from 'expo-location';
-import { searchNearbyPlaces } from '../services/tomtomApi';
 
 const TOMTOM_API_KEY = 'yyxXlbgc7wMsUKBZY88fGXiCqM0IHspm';
-
-// Dữ liệu mẫu để test khi không có kết quả thực tế
-const SAMPLE_PLACES = [
-  { id: 's1', name: 'Quán Ăn Mẫu 1 - Món Khô', address: 'Đường A', position: { lat: 10.7760, lon: 106.7000 }, dishType: 'dry' },
-  { id: 's2', name: 'Quán Ăn Mẫu 2 - Món Nước', address: 'Đường B', position: { lat: 10.7770, lon: 106.7010 }, dishType: 'soup' },
-  { id: 's3', name: 'Quán Ăn Mẫu 3 - Món Khô', address: 'Đường C', position: { lat: 10.7750, lon: 106.6990 }, dishType: 'dry' },
-  { id: 's4', name: 'Quán Ăn Mẫu 4 - Món Chay', address: 'Đường D', position: { lat: 10.7780, lon: 106.7020 }, dishType: 'vegetarian' },
-  { id: 's5', name: 'Quán Ăn Mẫu 5 - Món Mặn', address: 'Đường E', position: { lat: 10.7740, lon: 106.6980 }, dishType: 'salty' },
-  { id: 's6', name: 'Quán Ăn Mẫu 6 - Hải Sản', address: 'Đường F', position: { lat: 10.7755, lon: 106.7005 }, dishType: 'seafood' },
-];
+const BACKEND_BASE_URL = 'http://192.168.1.2:5000/api';
 
 export default function MapScreen({ navigation }) {
+  // ===== LOCATION & MAP STATE =====
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
   const [query, setQuery] = useState('');
-  // 🏪 Danh sách các quán ăn lấy từ TomTom Nearby API
-  const [places, setPlaces] = useState([]);
-  const [showOnlyRestaurants, setShowOnlyRestaurants] = useState(false);
-  const [loadingPlaces, setLoadingPlaces] = useState(false);
-  const mapRef = useRef(null);
 
-  // --- MENU SLIDE-IN + CHECKBOX STATES ---
+  // ===== BACKEND DATA STATE =====
+  const [restaurants, setRestaurants] = useState([]);
+  const [loadingRestaurants, setLoadingRestaurants] = useState(false);
+
+  // ===== FILTER STATE (sent to backend) =====
+  const [filterRadius, setFilterRadius] = useState(2); // km - default 2km radius
+  const [filterCategories, setFilterCategories] = useState([]); // Category IDs: [1,2,3,4,5]
+  const [filterMinPrice, setFilterMinPrice] = useState(null);
+  const [filterMaxPrice, setFilterMaxPrice] = useState(null);
+  const [filterMinRating, setFilterMinRating] = useState(0);
+  const [filterMaxRating, setFilterMaxRating] = useState(5);
+  const [filterTags, setFilterTags] = useState([]);
+  const [filterLimit, setFilterLimit] = useState(100);
+
+  // ===== UI STATE =====
   const screenWidth = Dimensions.get('window').width;
-  const screenHeight = Dimensions.get('window').height;
-  // <-- Panel rộng 50% màn hình, cao tối đa 70% màn hình
   const panelWidth = Math.round(screenWidth / 2);
   const animX = useRef(new Animated.Value(-panelWidth)).current;
   const [menuVisible, setMenuVisible] = useState(false);
-  // checkbox states: default all selected
+
+  // Checkbox states for category filtering (maps to category_id)
   const [chkAll, setChkAll] = useState(true);
-  const [chkDry, setChkDry] = useState(true);
-  const [chkSoup, setChkSoup] = useState(true);
-  const [chkVegetarian, setChkVegetarian] = useState(true);
-  const [chkSalty, setChkSalty] = useState(true);
-  const [chkSeafood, setChkSeafood] = useState(true);
-  // tính vị trí panel để nằm dưới thanh tìm kiếm (searchContainer top + approx height)
+  const [chkDry, setChkDry] = useState(true);        // category_id: 1
+  const [chkSoup, setChkSoup] = useState(true);      // category_id: 2
+  const [chkVegetarian, setChkVegetarian] = useState(true); // category_id: 3
+  const [chkSalty, setChkSalty] = useState(true);    // category_id: 4
+  const [chkSeafood, setChkSeafood] = useState(true); // category_id: 5
+
   const searchTop = 40;
-  const searchHeight = 56; // nếu searchContainer thay đổi height, điều chỉnh ở đây
-  const panelTop = searchTop + searchHeight;
+  const searchHeight = 56;
+  const searchLeft = Math.round(screenWidth * 0.05);
+  const hamburgerTop = searchTop + searchHeight + 6;
+  const mapRef = useRef(null);
 
-  // <-- ADDED: vị trí căn trái và top cho hamburger để align với search bar và nằm dưới nó
-  const searchLeft = Math.round(screenWidth * 0.05); // searchContainer width = 90%, nên left = 5%
-  const hamburgerTop = searchTop + searchHeight + 6; // đặt hamburger nằm dưới search bar (cách 6px)
+  // ===== BACKEND API: FETCH FILTERED LOCATIONS =====
+  /**
+   * Posts filter parameters to backend /api/map/filter
+   * Backend returns filtered list with distance calculated server-side
+   */
+  const fetchFilteredLocations = async () => {
+    if (!userLocation) {
+      Alert.alert('Lỗi', 'Vui lòng bật định vị trước');
+      return;
+    }
 
+    setLoadingRestaurants(true);
+    try {
+      // Map checkbox states to category IDs
+      // IMPORTANT: Always send the categories array (even if empty) for strict filtering
+      // - Empty array [] = filter strictly (no categories match → return 0 results)
+      // - Non-empty array [1,2,3] = filter strictly (return only these categories)
+      // - Sending undefined would make backend treat it as "no filter" and return all
+      const selectedCategories = [];
+      if (chkDry) selectedCategories.push(1);
+      if (chkSoup) selectedCategories.push(2);
+      if (chkVegetarian) selectedCategories.push(3);
+      if (chkSalty) selectedCategories.push(4);
+      if (chkSeafood) selectedCategories.push(5);
+
+      const requestBody = {
+        lat: userLocation.latitude,
+        lon: userLocation.longitude,
+        radius: filterRadius,
+        categories: selectedCategories, // ALWAYS send array (even if empty)
+        min_price: filterMinPrice,
+        max_price: filterMaxPrice,
+        min_rating: filterMinRating,
+        max_rating: filterMaxRating,
+        tags: filterTags.length > 0 ? filterTags : undefined,
+        limit: filterLimit,
+      };
+
+      console.log('📤 Sending filter request to backend:', requestBody);
+
+      const response = await axios.post(`${BACKEND_BASE_URL}/map/filter`, requestBody, {
+        timeout: 5000,
+      });
+
+      if (response.data.success) {
+        console.log(`✅ Received ${response.data.total} restaurants from backend`);
+        setRestaurants(response.data.places || []);
+      } else {
+        Alert.alert('Lỗi', response.data.message || 'Không thể lấy danh sách nhà hàng');
+        setRestaurants([]);
+      }
+    } catch (error) {
+      console.error('❌ Backend filter error:', error.message);
+      Alert.alert('Lỗi kết nối', `Không thể kết nối đến server: ${error.message}\n\nKiểm tra:\n- Backend đang chạy tại http://192.168.1.2:5000\n- Firewall cho phép kết nối`);
+      setRestaurants([]);
+    } finally {
+      setLoadingRestaurants(false);
+    }
+  };
+
+  // ===== MENU & CHECKBOX HANDLERS =====
   const openMenu = () => {
     setMenuVisible(true);
     Animated.timing(animX, { toValue: 0, duration: 250, useNativeDriver: true }).start();
   };
+
   const closeMenu = () => {
     Animated.timing(animX, { toValue: -panelWidth, duration: 200, useNativeDriver: true }).start(() => {
       setMenuVisible(false);
     });
   };
 
-  // checkbox logic
+  // Checkbox handlers - update categories and trigger re-fetch
   const toggleAll = () => {
     const newVal = !chkAll;
     setChkAll(newVal);
@@ -72,88 +131,43 @@ export default function MapScreen({ navigation }) {
     setChkSalty(newVal);
     setChkSeafood(newVal);
   };
+
   const toggleDry = () => {
     const next = !chkDry;
     setChkDry(next);
     setChkAll(next && chkSoup && chkVegetarian && chkSalty && chkSeafood);
   };
+
   const toggleSoup = () => {
     const next = !chkSoup;
     setChkSoup(next);
     setChkAll(chkDry && next && chkVegetarian && chkSalty && chkSeafood);
   };
+
   const toggleVegetarian = () => {
     const next = !chkVegetarian;
     setChkVegetarian(next);
     setChkAll(chkDry && chkSoup && next && chkSalty && chkSeafood);
   };
+
   const toggleSalty = () => {
     const next = !chkSalty;
     setChkSalty(next);
     setChkAll(chkDry && chkSoup && chkVegetarian && next && chkSeafood);
   };
+
   const toggleSeafood = () => {
     const next = !chkSeafood;
     setChkSeafood(next);
     setChkAll(chkDry && chkSoup && chkVegetarian && chkSalty && next);
   };
-  // helper to decide visibility of a place based on dishType
-  const shouldShowPlace = (place) => {
-    // if all unchecked, show none
-    if (!chkDry && !chkSoup && !chkVegetarian && !chkSalty && !chkSeafood) return false;
-    // Handle places without dishType (shouldn't happen, but just in case)
-    const type = place.dishType || 'dry'; // Default to 'dry' if missing
-    if (type === 'dry') return chkDry;
-    if (type === 'soup') return chkSoup;
-    if (type === 'vegetarian') return chkVegetarian;
-    if (type === 'salty') return chkSalty;
-    if (type === 'seafood') return chkSeafood;
-    return true; // Show unknown types by default
-  };
-  // Function to determine marker color based on dishType
-  const getMarkerStyleByDishType = (dishType) => {
-    if (dishType === 'dry') {
-      return { 
-        pinColor: '#FF9500', // Orange for dry dishes
-      };
-    } else if (dishType === 'soup') {
-      return { 
-        pinColor: '#00BCD4', // Cyan/Teal for soup dishes
-      };
-    } else if (dishType === 'vegetarian') {
-      return {
-        pinColor: '#4CAF50', // Green for vegetarian dishes
-      };
-    } else if (dishType === 'salty') {
-      return {
-        pinColor: '#F44336', // Red for salty dishes
-      };
-    } else if (dishType === 'seafood') {
-      return {
-        pinColor: '#2196F3', // Blue for seafood dishes
-      };
-    }
-    return { pinColor: 'red' }; // Default fallback
-  };
-  // --- end menu/check logic ---
 
-  // tạo mảng hiển thị chung (API + SAMPLE), đánh dấu sample và đảm bảo id không trùng
-  const combinedPlaces = React.useMemo(() => {
-    const samples = SAMPLE_PLACES.map(s => ({
-      ...s,
-      id: 'sample-' + s.id, // đảm bảo không trùng với id API
-      _isSample: true,
-    }));
-    // giữ nguyên thứ tự: hiện API trước, sample bổ sung
-    return [...places, ...samples];
-  }, [places]);
-
-  // 📍 Lấy vị trí hiện tại của người dùng + lấy danh sách quán ăn gần đó từ TomTom
+  // ===== LIFECYCLE: Initialize location + fetch restaurants =====
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Quyền truy cập vị trí bị từ chối');
+        Alert.alert('Lỗi', 'Quyền truy cập vị trí bị từ chối');
         return;
       }
 
@@ -165,24 +179,18 @@ export default function MapScreen({ navigation }) {
         longitudeDelta: 0.05,
       };
       setUserLocation(userRegion);
-
-      // 🏪 Gọi TomTom Nearby API để lấy danh sách quán ăn xung quanh vị trí người dùng
-      setLoadingPlaces(true);
-      const nearbyPlaces = await searchNearbyPlaces({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
-      // Nếu TomTom không trả về kết quả (ví dụ dev trên máy local), dùng dữ liệu mẫu để test
-      if (!nearbyPlaces || nearbyPlaces.length === 0) {
-        setPlaces(SAMPLE_PLACES);
-      } else {
-        setPlaces(nearbyPlaces);
-      }
-      setLoadingPlaces(false);
     })();
   }, []);
 
-  // 🔍 Tìm kiếm địa điểm bằng TomTom Search API
+  // Fetch restaurants whenever any filter changes
+  useEffect(() => {
+    if (userLocation) {
+      fetchFilteredLocations();
+    }
+  }, [filterRadius, filterMinPrice, filterMaxPrice, filterMinRating, filterMaxRating, filterTags, chkDry, chkSoup, chkVegetarian, chkSalty, chkSeafood]);
+
+  // ===== TOMTOM API FUNCTIONS =====
+  // 🔍 Search for locations using TomTom Search API
   const handleSearch = async () => {
     if (!query.trim()) return;
 
@@ -215,14 +223,14 @@ export default function MapScreen({ navigation }) {
     }
   };
 
-  // 🧭 Lấy chỉ đường bằng TomTom Routing API
+  // 🧭 Get directions using TomTom Routing API
   const handleRoute = async () => {
     if (!userLocation || !destination) {
       Alert.alert('Vui lòng bật định vị và chọn điểm đến trước');
       return;
     }
 
-    // Kiểm tra trùng tọa độ
+    // Check if coordinates are too close
     if (Math.abs(userLocation.latitude - destination.latitude) < 0.0001 &&
         Math.abs(userLocation.longitude - destination.longitude) < 0.0001) {
       Alert.alert('Vị trí hiện tại và điểm đến quá gần — không thể tạo tuyến đường.');
@@ -232,12 +240,9 @@ export default function MapScreen({ navigation }) {
     try {
       const url = `https://api.tomtom.com/routing/1/calculateRoute/${userLocation.longitude},${userLocation.latitude}:${destination.longitude},${destination.latitude}/json?key=${TOMTOM_API_KEY}`;
 
-      console.log('TomTom route URL:', url);
-
       const res = await axios.get(url);
 
       if (!res.data.routes || res.data.routes.length === 0) {
-        console.error('Không có route:', res.data);
         Alert.alert('Không tìm thấy đường đi.');
         return;
       }
@@ -249,15 +254,12 @@ export default function MapScreen({ navigation }) {
 
       setRouteCoords(points);
     } catch (err) {
-      console.error('TomTom route error:', err.response?.data || err.message);
-      Alert.alert(
-        'Không thể lấy chỉ đường',
-        err.response?.data?.error?.description || err.message
-      );
+      console.error('TomTom route error:', err.message);
+      Alert.alert('Không thể lấy chỉ đường', err.message);
     }
   };
 
-  // Handle restaurant marker callout press - navigate to RestaurantDetail
+  // Navigate to restaurant detail screen
   const handleRestaurantPress = (place) => {
     const item = {
       id: place.id,
@@ -267,9 +269,8 @@ export default function MapScreen({ navigation }) {
       dishType: place.dishType,
       rating: place.rating || 4.5,
       category: place.category || 'Restaurant',
-      image: require('../assets/amthuc.jpg'), // Default image
+      image: require('../assets/amthuc.jpg'),
     };
-    // Navigate to nested screen in HomeStackNavigator
     navigation.navigate('HomeStack', {
       screen: 'RestaurantDetail',
       params: { item }
@@ -288,53 +289,57 @@ export default function MapScreen({ navigation }) {
           <Marker coordinate={userLocation} title="Vị trí của bạn" />
           {destination && <Marker coordinate={destination} title="Điểm đến" pinColor="red" />}
 
-          {/* Hiển thị chung: API + SAMPLE_PLACES, TUÂN THEO FILTER DISHTYPE */}
-          {combinedPlaces && combinedPlaces.length > 0 && combinedPlaces.map(place => {
-            // quyết định hiển thị theo checkbox
-            if (!shouldShowPlace(place)) return null;
+          {/* Display filtered restaurants from backend */}
+          {restaurants && restaurants.length > 0 && restaurants.map(restaurant => (
+            <Marker
+              key={restaurant.id}
+              coordinate={{
+                latitude: restaurant.position.lat,
+                longitude: restaurant.position.lon,
+              }}
+              title={restaurant.name}
+              description={restaurant.address}
+              pinColor={restaurant.pinColor}
+            >
+              <Callout onPress={() => handleRestaurantPress(restaurant)} tooltip={true}>
+                <View style={styles.calloutContainer}>
+                  <Text style={styles.calloutTitle}>{restaurant.name}</Text>
+                  <Text style={styles.calloutAddress}>{restaurant.address}</Text>
+                  {restaurant.distance && <Text style={styles.calloutDistance}>Khoảng cách: {restaurant.distance} km</Text>}
+                  {restaurant.rating && <Text style={styles.calloutRating}>Rating: {restaurant.rating} ⭐</Text>}
+                  <Text style={styles.calloutTapHint}>Nhấn để xem chi tiết</Text>
+                </View>
+              </Callout>
+            </Marker>
+          ))}
 
-            // xác định màu marker dựa trên dishType
-            const markerStyle = getMarkerStyleByDishType(place.dishType);
+          {routeCoords.length > 0 && (
+            <Polyline coordinates={routeCoords} strokeWidth={4} strokeColor="blue" />
+          )}
+        </MapView>
+      ) : (
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="#ff6347" />
+        </View>
+      )}
 
-            return (
-              <Marker
-                key={place.id}
-                coordinate={{ latitude: place.position.lat, longitude: place.position.lon }}
-                title={place.name}
-                description={place.address}
-                pinColor={markerStyle.pinColor}
-              >
-                <Callout onPress={() => handleRestaurantPress(place)} tooltip={true}>
-                  <View style={styles.calloutContainer}>
-                    <Text style={styles.calloutTitle}>{place.name}</Text>
-                    <Text style={styles.calloutAddress}>{place.address}</Text>
-                    <Text style={styles.calloutTapHint}>Nhấn để xem chi tiết</Text>
-                  </View>
-                </Callout>
-              </Marker>
-            );
-          })}
-           
-           {routeCoords.length > 0 && (
-             <Polyline coordinates={routeCoords} strokeWidth={4} strokeColor="blue" />
-           )}
-         </MapView>
-       ) : (
-         <View style={styles.loading}>
-           <ActivityIndicator size="large" color="#ff6347" />
-         </View>
-       )}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Nhập tên quán ăn..."
+          value={query}
+          onChangeText={setQuery}
+        />
+        <Button title="Tìm" onPress={handleSearch} />
+        <Button title="Chỉ đường" onPress={handleRoute} />
+      </View>
 
-       <View style={styles.searchContainer}>
-         <TextInput
-           style={styles.input}
-           placeholder="Nhập tên quán ăn..."
-           value={query}
-           onChangeText={setQuery}
-         />
-         <Button title="Tìm" onPress={handleSearch} />
-         <Button title="Chỉ đường" onPress={handleRoute} />
-       </View>
+      {loadingRestaurants && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#2196F3" />
+          <Text style={styles.loadingText}>Đang tải nhà hàng...</Text>
+        </View>
+      )}
       {/* Hamburger menu, giờ nằm dưới search bar và align trái với searchContainer */}
       <TouchableOpacity style={[styles.hamburger, { top: hamburgerTop, left: searchLeft }]} onPress={openMenu}>
          <View style={styles.hbLine} />
@@ -537,5 +542,34 @@ export default function MapScreen({ navigation }) {
      color: '#2196F3',
      fontWeight: '600',
      fontStyle: 'italic',
+   },
+   calloutDistance: {
+     fontSize: 11,
+     color: '#2ecc71',
+     marginBottom: 4,
+     fontWeight: '500',
+   },
+   calloutRating: {
+     fontSize: 11,
+     color: '#FF9500',
+     marginBottom: 4,
+     fontWeight: '500',
+   },
+   loadingOverlay: {
+     position: 'absolute',
+     top: 0,
+     left: 0,
+     right: 0,
+     bottom: 0,
+     backgroundColor: 'rgba(0,0,0,0.3)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     zIndex: 100,
+   },
+   loadingText: {
+     marginTop: 10,
+     fontSize: 14,
+     color: '#fff',
+     fontWeight: '600',
    },
  });
