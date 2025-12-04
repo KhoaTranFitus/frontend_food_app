@@ -3,7 +3,8 @@ import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-nativ
 import MapView, { Marker } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { searchAddress } from '../services/tomtomApi.jsx';
+import axios from 'axios';
+import { BACKEND_API } from '../config/api';
 
 export default function SearchScreen({navigation}) {
   const [query, setQuery] = useState('');
@@ -20,8 +21,21 @@ export default function SearchScreen({navigation}) {
   },[]);
 
   const handleSearch = async ()=>{
-    const res = await searchAddress(query);
-    setResults(res || []);
+    try {
+      const response = await axios.post(`${BACKEND_API}/api/search`, {
+        query: query,
+        lat: userLoc?.latitude,
+        lon: userLoc?.longitude,
+        radius: 50
+      });
+      
+      if (response.data.success && response.data.places) {
+        setResults(response.data.places);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setResults([]);
+    }
   };
 
   return (
@@ -30,9 +44,27 @@ export default function SearchScreen({navigation}) {
         <TextInput placeholder="Tìm nhà hàng, ẩm thực..." value={query} onChangeText={setQuery} style={styles.input} />
         <TouchableOpacity style={styles.btn} onPress={handleSearch}><Text style={{color:'#fff'}}>Tìm</Text></TouchableOpacity>
       </View>
-      <MapView style={{flex:1}} initialRegion={{latitude:userLoc?.latitude||10.776530, longitude:userLoc?.longitude||106.700981, latitudeDelta:0.08, longitudeDelta:0.08}}>
+      <MapView 
+        style={{flex:1}} 
+        initialRegion={{
+          latitude:userLoc?.latitude||10.776530, 
+          longitude:userLoc?.longitude||106.700981, 
+          latitudeDelta:0.08, 
+          longitudeDelta:0.08
+        }}
+        showsPointsOfInterest={false}
+        showsBuildings={false}
+      >
         {userLoc && <Marker coordinate={userLoc} title="Bạn" />}
-        {results.map((r, idx)=>(<Marker key={idx} coordinate={{latitude:r.position.lat, longitude:r.position.lon}} title={r.poi?.name || r.address.freeformAddress} />))}
+        {results.map((r, idx)=>(
+          <Marker 
+            key={idx} 
+            coordinate={{latitude: r.position.lat, longitude: r.position.lon}} 
+            title={r.name} 
+            description={r.address}
+            pinColor={r.pinColor}
+          />
+        ))}
       </MapView>
     </SafeAreaView>
   );

@@ -4,26 +4,14 @@ import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as Location from 'expo-location';
-import { searchNearbyPlaces } from '../services/tomtomApi';
-
-const TOMTOM_API_KEY = 'yyxXlbgc7wMsUKBZY88fGXiCqM0IHspm';
-
-// Dữ liệu mẫu để test khi không có kết quả thực tế
-const SAMPLE_PLACES = [
-  { id: 's1', name: 'Quán Ăn Mẫu 1 - Món Khô', address: 'Đường A', position: { lat: 10.7760, lon: 106.7000 }, dishType: 'dry' },
-  { id: 's2', name: 'Quán Ăn Mẫu 2 - Món Nước', address: 'Đường B', position: { lat: 10.7770, lon: 106.7010 }, dishType: 'soup' },
-  { id: 's3', name: 'Quán Ăn Mẫu 3 - Món Khô', address: 'Đường C', position: { lat: 10.7750, lon: 106.6990 }, dishType: 'dry' },
-  { id: 's4', name: 'Quán Ăn Mẫu 4 - Món Chay', address: 'Đường D', position: { lat: 10.7780, lon: 106.7020 }, dishType: 'vegetarian' },
-  { id: 's5', name: 'Quán Ăn Mẫu 5 - Món Mặn', address: 'Đường E', position: { lat: 10.7740, lon: 106.6980 }, dishType: 'salty' },
-  { id: 's6', name: 'Quán Ăn Mẫu 6 - Hải Sản', address: 'Đường F', position: { lat: 10.7755, lon: 106.7005 }, dishType: 'seafood' },
-];
+import { BACKEND_API } from '../config/api';
 
 export default function MapScreen({ navigation }) {
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
   const [query, setQuery] = useState('');
-  // 🏪 Danh sách các quán ăn lấy từ TomTom Nearby API
+  // 🏪 Danh sách các quán ăn từ backend
   const [places, setPlaces] = useState([]);
   const [showOnlyRestaurants, setShowOnlyRestaurants] = useState(false);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
@@ -137,18 +125,7 @@ export default function MapScreen({ navigation }) {
   };
   // --- end menu/check logic ---
 
-  // tạo mảng hiển thị chung (API + SAMPLE), đánh dấu sample và đảm bảo id không trùng
-  const combinedPlaces = React.useMemo(() => {
-    const samples = SAMPLE_PLACES.map(s => ({
-      ...s,
-      id: 'sample-' + s.id, // đảm bảo không trùng với id API
-      _isSample: true,
-    }));
-    // giữ nguyên thứ tự: hiện API trước, sample bổ sung
-    return [...places, ...samples];
-  }, [places]);
-
-  // 📍 Lấy vị trí hiện tại của người dùng + lấy danh sách quán ăn gần đó từ TomTom
+  // 📍 Lấy vị trí hiện tại + load markers từ backend
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
@@ -166,56 +143,72 @@ export default function MapScreen({ navigation }) {
       };
       setUserLocation(userRegion);
 
-      // 🏪 Gọi TomTom Nearby API để lấy danh sách quán ăn xung quanh vị trí người dùng
+      // 🏪 Gọi backend API để lấy markers
       setLoadingPlaces(true);
-      const nearbyPlaces = await searchNearbyPlaces({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-      });
-      // Nếu TomTom không trả về kết quả (ví dụ dev trên máy local), dùng dữ liệu mẫu để test
-      if (!nearbyPlaces || nearbyPlaces.length === 0) {
-        setPlaces(SAMPLE_PLACES);
-      } else {
-        setPlaces(nearbyPlaces);
+      try {
+        const url = `${BACKEND_API}/api/search`;
+        console.log('🔗 Calling API:', url);
+        console.log('📦 Request body:', { lat: coords.latitude, lon: coords.longitude, radius: 50 });
+        
+        const response = await axios.post(url, {
+          lat: coords.latitude,
+          lon: coords.longitude,
+          radius: 50, // 50km để cover vùng rộng
+        });
+        
+        console.log('✅ Response status:', response.status);
+        console.log('📊 Places count:', response.data.places?.length);
+        
+        if (response.data.success && response.data.places) {
+          setPlaces(response.data.places);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching places:', error);
+        console.error('🔗 BACKEND_API:', BACKEND_API);
+        console.error('📝 Error response:', error.response?.data);
+        console.error('🔢 Error status:', error.response?.status);
+        Alert.alert('Lỗi', 'Không thể tải danh sách nhà hàng');
       }
       setLoadingPlaces(false);
     })();
   }, []);
 
-  // 🔍 Tìm kiếm địa điểm bằng TomTom Search API
+  // 🔍 Tìm kiếm nhà hàng theo tên
   const handleSearch = async () => {
     if (!query.trim()) return;
 
     try {
-      const res = await axios.get(
-        `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(query)}.json?key=${TOMTOM_API_KEY}`
+      // Tìm trong danh sách places hiện có
+      const found = places.find(p => 
+        p.name.toLowerCase().includes(query.toLowerCase())
       );
 
-      const result = res.data.results[0];
-      if (!result) {
-        Alert.alert('Không tìm thấy địa điểm');
+      if (!found) {
+        Alert.alert('Không tìm thấy nhà hàng');
         return;
       }
 
-      const { lat, lon } = result.position;
-      const dest = { latitude: lat, longitude: lon };
+      const dest = { 
+        latitude: found.position.lat, 
+        longitude: found.position.lon 
+      };
       setDestination(dest);
 
       if (mapRef.current) {
         mapRef.current.animateToRegion({
-          latitude: lat,
-          longitude: lon,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
+          latitude: found.position.lat,
+          longitude: found.position.lon,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
         }, 1500);
       }
     } catch (err) {
-      console.error('TomTom search error:', err.response?.data || err.message);
-      Alert.alert('Lỗi khi tìm kiếm địa điểm');
+      console.error('Search error:', err.message);
+      Alert.alert('Lỗi khi tìm kiếm');
     }
   };
 
-  // 🧭 Lấy chỉ đường bằng TomTom Routing API
+  // 🧭 Lấy chỉ đường bằng backend OSRM API
   const handleRoute = async () => {
     if (!userLocation || !destination) {
       Alert.alert('Vui lòng bật định vị và chọn điểm đến trước');
@@ -230,29 +223,35 @@ export default function MapScreen({ navigation }) {
     }
 
     try {
-      const url = `https://api.tomtom.com/routing/1/calculateRoute/${userLocation.longitude},${userLocation.latitude}:${destination.longitude},${destination.latitude}/json?key=${TOMTOM_API_KEY}`;
+      const response = await axios.post(`${BACKEND_API}/api/food/direction`, {
+        origin: {
+          lat: userLocation.latitude,
+          lon: userLocation.longitude
+        },
+        destination: {
+          lat: destination.latitude,
+          lon: destination.longitude
+        },
+        mode: 'driving'
+      });
 
-      console.log('TomTom route URL:', url);
-
-      const res = await axios.get(url);
-
-      if (!res.data.routes || res.data.routes.length === 0) {
-        console.error('Không có route:', res.data);
+      if (!response.data.routes || response.data.routes.length === 0) {
         Alert.alert('Không tìm thấy đường đi.');
         return;
       }
 
-      const points = res.data.routes[0].legs[0].points.map(p => ({
-        latitude: p.latitude,
-        longitude: p.longitude,
+      // Backend trả về coordinates dạng [lon, lat]
+      const points = response.data.routes[0].geometry.coordinates.map(coord => ({
+        latitude: coord[1],
+        longitude: coord[0]
       }));
 
       setRouteCoords(points);
     } catch (err) {
-      console.error('TomTom route error:', err.response?.data || err.message);
+      console.error('Route error:', err.response?.data || err.message);
       Alert.alert(
         'Không thể lấy chỉ đường',
-        err.response?.data?.error?.description || err.message
+        err.response?.data?.error || err.message
       );
     }
   };
@@ -284,12 +283,16 @@ export default function MapScreen({ navigation }) {
           style={styles.map}
           initialRegion={userLocation}
           showsUserLocation={true}
+          showsPointsOfInterest={false}
+          showsBuildings={false}
+          showsTraffic={false}
+          showsIndoors={false}
         >
           <Marker coordinate={userLocation} title="Vị trí của bạn" />
           {destination && <Marker coordinate={destination} title="Điểm đến" pinColor="red" />}
 
-          {/* Hiển thị chung: API + SAMPLE_PLACES, TUÂN THEO FILTER DISHTYPE */}
-          {combinedPlaces && combinedPlaces.length > 0 && combinedPlaces.map(place => {
+          {/* Hiển thị markers từ backend */}
+          {places && places.length > 0 && places.map(place => {
             // quyết định hiển thị theo checkbox
             if (!shouldShowPlace(place)) return null;
 
