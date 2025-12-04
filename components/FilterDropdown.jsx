@@ -1,45 +1,46 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+// components/FilterDropdown.jsx
 
-export default function FilterDropdown({ visible, onSelect, onClose, style }) {
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, Pressable } from 'react-native';
+
+export default function FilterDropdown({ visible, onSelect, onClose, style, provinces }) {
   if (!visible) return null;
 
-  // provinces list: display label and pass id/key to onSelect
-  const provinces = [
-    { id: 'hcm', label: 'TP HCM' },
-    { id: 'danang', label: 'Đà Nẵng' },
-    { id: 'quangngai', label: 'Quảng Ngãi' },
-    { id: 'hanoi', label: 'Hà Nội' },
-    // Add more provinces as needed
-    { id: 'nghean', label: 'Nghệ An' },
-    { id: 'binhduong', label: 'Bình Dương' },
-    { id: 'longan', label: 'Long An' },
-    { id: 'cantho', label: 'Cần Thơ' },
-  ];  
-
-
   return (
-    <View style={[styles.dropdown, style]}>
-      <ScrollView>
-      {provinces.map((p) => (
-        <TouchableOpacity key={p.id} onPress={() => onSelect && onSelect(p.id)} style={styles.item}>
-          <Text>{p.label}</Text>
-        </TouchableOpacity>
-      ))}
-
-      <TouchableOpacity onPress={onClose} style={styles.item}>
-        <Text style={{ color: 'blue' }}>Đóng</Text>
-      </TouchableOpacity>
-      </ScrollView>
-    </View>
+    <Modal
+      animationType="fade"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.overlay} onPress={onClose}>
+        {/* Sử dụng Pressable thay vì TouchableOpacity để tránh phản ứng nhấp nháy */}
+        <Pressable style={[styles.dropdown, style]}>
+          <ScrollView showsVerticalScrollIndicator={true}>
+            {provinces.map((p) => (
+              <TouchableOpacity
+                key={p.id}
+                onPress={() => onSelect(p.id)}
+                style={styles.item}
+              >
+                <Text style={styles.itemText}>{p.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)', // Màu mờ nhẹ khi mở dropdown
+  },
   dropdown: {
     position: 'absolute',
-    top: 50,
-    right: 10,
+    // Căn theo style prop được truyền từ HomeHeader
     backgroundColor: '#fff',
     borderRadius: 8,
     width: 150,
@@ -50,9 +51,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     zIndex: 1000,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    overflow: 'hidden',
   },
   item: {
     paddingVertical: 10,
     paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  itemText: {
+    fontSize: 14,
+    color: '#333',
   },
 });
