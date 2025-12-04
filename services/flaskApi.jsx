@@ -1,18 +1,14 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BACKEND_API } from '../config/api';
 
 // ============ CONFIG ============
-// Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.2:5000/api';
-const PROD_BASE_URL = 'https://your-production-server.com/api';
+console.log('API Base URL:', BACKEND_API);
 
-const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
-
-console.log('API Base URL:', BASE_URL);
 
 // Tạo instance axios
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: `${BACKEND_API}/api`,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
@@ -49,8 +45,8 @@ apiClient.interceptors.response.use(
     if (!error.response) {
       // Network error - in ra chi tiết
       console.error('❌ Network error:', error.message);
-      console.error('🔗 API URL:', BASE_URL);
-      error.message = 'Lỗi kết nối. Kiểm tra:\n1. Backend có đang chạy không?\n2. IP đúng không? (' + BASE_URL + ')\n3. Device có cùng WiFi không?';
+      console.error('🔗 API URL:', BACKEND_API);
+      error.message = 'Lỗi kết nối. Kiểm tra:\n1. Backend có đang chạy không?\n2. IP đúng không? (' + BACKEND_API + ')\n3. Device có cùng WiFi không?';
     } else if (error.response.status === 500) {
       error.message = 'Lỗi server: ' + (error.response.data?.error || 'Unknown error');
     } else if (error.response.data?.error) {
