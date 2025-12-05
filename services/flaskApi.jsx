@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.2:5000/api';
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
 const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
