@@ -35,7 +35,7 @@ export default function LoginScreen() {
     try {
       const result = await authAPI.login(email, password);
       console.log('Login success:', result);
-      
+
       // Gọi login từ AuthContext để update state
       // Token đã được lưu bởi interceptor
       if (login) {
@@ -123,8 +123,8 @@ export default function LoginScreen() {
             <Text style={styles.forgot}>Forgot password?</Text>
           </TouchableOpacity>
           {/* LOGIN BUTTON */}
-          <TouchableOpacity 
-            style={[styles.loginBtn, loading && { opacity: 0.6 }]} 
+          <TouchableOpacity
+            style={[styles.loginBtn, loading && { opacity: 0.6 }]}
             onPress={handleLogin}
             disabled={loading}
           >

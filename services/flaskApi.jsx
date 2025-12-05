@@ -1,9 +1,11 @@
+//flaskApi.jsx
+
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.2:5000/api';
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
 const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
@@ -30,6 +32,13 @@ apiClient.interceptors.request.use(
     } catch (error) {
       console.warn('Error getting token:', error);
     }
+
+    // Log outbound request payload without leaking auth header
+    const { method, url, params, data } = config;
+    console.log('API request ->', method?.toUpperCase(), url, {
+      params,
+      data,
+    });
     return config;
   },
   (error) => Promise.reject(error)
@@ -72,13 +81,13 @@ export const authAPI = {
         password,
         name,
       });
-      
+
       // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.token || response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Register error:', error);
@@ -88,23 +97,20 @@ export const authAPI = {
 
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('/login', {
-        email,
-        password,
-      });
-      
-      // Lưu token - backend có thể trả token, idToken, hoặc không trả
-      const token = response.data?.token || response.data?.idToken;
+      const response = await apiClient.post('/login', { email, password });
+
+      const token = response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Login error:', error);
-      throw error.response?.data || { error: error.message };
+      throw error;
     }
   },
+
 
   logout: async () => {
     try {
@@ -167,66 +173,13 @@ export const authAPI = {
   },
 };
 
-// ============ USER PROFILE ENDPOINTS ============
-export const userAPI = {
-  getProfile: async () => {
-    try {
-      const response = await apiClient.get('/users/profile');
-      return response.data;
-    } catch (error) {
-      console.error('Get profile error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  updateProfile: async (userData) => {
-    try {
-      const response = await apiClient.put('/users/profile', userData);
-      return response.data;
-    } catch (error) {
-      console.error('Update profile error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  uploadAvatar: async (imageUri) => {
-    try {
-      const formData = new FormData();
-      formData.append('avatar', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: `avatar_${Date.now()}.jpg`,
-      });
-
-      const response = await apiClient.post('/users/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Upload avatar error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  deleteAccount: async () => {
-    try {
-      const response = await apiClient.delete('/users/account');
-      await AsyncStorage.removeItem('authToken');
-      return response.data;
-    } catch (error) {
-      console.error('Delete account error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-};
-
 // ============ RESTAURANT ENDPOINTS ============
 export const restaurantAPI = {
+  // ⭐️ MODIFIED: Changed endpoint từ '/restaurants' sang '/restaurants/search' ⭐️
+  // Đây là endpoint được sử dụng cho tìm kiếm có lọc (query, lat, lon)
   getAll: async (filters = {}) => {
     try {
-      const response = await apiClient.get('/restaurants', { params: filters });
+      const response = await apiClient.post('/search', filters);
       return response.data;
     } catch (error) {
       console.error('Get restaurants error:', error);
@@ -244,17 +197,7 @@ export const restaurantAPI = {
     }
   },
 
-  search: async (query) => {
-    try {
-      const response = await apiClient.get('/restaurants/search', {
-        params: { q: query },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Search restaurants error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+  // Đã loại bỏ phương thức 'search' cũ để tránh nhầm lẫn, 'getAll' giờ là phương thức tìm kiếm chính.
 
   getNearby: async (latitude, longitude, radius = 5000) => {
     try {
