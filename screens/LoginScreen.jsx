@@ -44,7 +44,19 @@ export default function LoginScreen() {
       // Navigation sẽ tự động xảy ra từ AppNavigator khi isLoggedIn = true
     } catch (error) {
       console.error('Login error:', error);
-      alert(error.error || error.message || 'Đăng nhập thất bại');
+      
+      // Kiểm tra nếu lỗi là email chưa được xác thực
+      const errorMessage = error.error || error.message || '';
+      if (errorMessage.includes('chưa được xác thực') || errorMessage.includes('not verified')) {
+        alert('Email chưa được xác thực. Bạn sẽ được chuyển đến màn hình xác thực.');
+        // Chuyển đến màn hình verify với email đã nhập
+        navigation.navigate('Verify', {
+          mode: 'verify_email',
+          email: email,
+        });
+      } else {
+        alert(errorMessage || 'Đăng nhập thất bại');
+      }
     } finally {
       setLoading(false);
     }

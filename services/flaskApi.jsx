@@ -57,8 +57,9 @@ apiClient.interceptors.response.use(
     // Xử lý các loại lỗi khác nhau
     if (!error.response) {
       // Network error - in ra chi tiết
-      console.error('❌ Network error:', error.message);
-      console.error('🔗 API URL:', BASE_URL);
+      console.error('Network error:', error.message);
+      console.error('Error details:', error);
+      console.error('API URL:', BASE_URL);
       error.message = 'Lỗi kết nối. Kiểm tra:\n1. Backend có đang chạy không?\n2. IP đúng không? (' + BASE_URL + ')\n3. Device có cùng WiFi không?';
     } else if (error.response.status === 500) {
       error.message = 'Lỗi server: ' + (error.response.data?.error || 'Unknown error');
@@ -228,7 +229,7 @@ export const foodAPI = {
       const response = await apiClient.get('/foods', { params: filters });
       return response.data;
     } catch (error) {
-      console.error('Get foods error:', error);
+      console.error('Get foods error:`', error);
       throw error.response?.data || { error: error.message };
     }
   },
@@ -397,25 +398,43 @@ export const categoryAPI = {
 
 // ============ CHATBOT ENDPOINTS ============
 export const chatbotAPI = {
-  // Gửi tin nhắn và nhận phản hồi từ chatbot
-  sendMessage: async (message) => {
+  // Gửi tin nhắn và nhận phản hồi từ chatbot OpenAI
+  sendMessage: async (message, conversationId = null) => {
     try {
-      const response = await apiClient.post('/chatbot', {
-        message,
+      const response = await apiClient.post('/chat', {
+        message: message,
+        conversation_id: conversationId, // Giữ conversation để có context
       });
+      
+      // Backend trả về: { conversation_id, user_message, bot_response, timestamp }
       return response.data;
     } catch (error) {
       console.error('Send chatbot message error:', error);
+      
+      // Xử lý lỗi cụ thể
+      if (error.response?.status === 500 && error.response?.data?.error?.includes('API key')) {
+        throw { error: '⚠️ Backend chatbot chưa cấu hình OpenAI API key. Vui lòng kiểm tra file .env' };
+      }
+      
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // Kiểm tra trạng thái chatbot
+  checkStatus: async () => {
+    try {
+      const response = await apiClient.get('/chat/status');
+      return response.data;
+    } catch (error) {
+      console.error('Check chatbot status error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
   // Lấy lịch sử chat của user
-  getChatHistory: async (limit = 50) => {
+  getChatHistory: async (conversationId) => {
     try {
-      const response = await apiClient.get('/chatbot/history', {
-        params: { limit },
-      });
+      const response = await apiClient.get(`/chat/history/${conversationId}`);
       return response.data;
     } catch (error) {
       console.error('Get chat history error:', error);
