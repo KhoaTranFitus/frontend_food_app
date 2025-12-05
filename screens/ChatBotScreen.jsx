@@ -9,6 +9,8 @@ export default function ChatBotScreen() {
     { id: 1, text: 'Chào bro! 👨‍🍳 Tôi là Food App AI, sẵn sàng giúp bro tìm nhà hàng tuyệt vời hoặc gợi ý các món ăn ngon!', isBot: true },
   ]);
   const [input, setInput] = useState('');
+  const [conversationId, setConversationId] = useState(null); // Lưu conversation ID
+  const [isLoading, setIsLoading] = useState(false);
 
   const quickSuggestions = [
     { id: 1, emoji: '🍜', text: 'Gợi ý quán phở', query: 'Quán phở tốt nhất' },
@@ -19,7 +21,7 @@ export default function ChatBotScreen() {
 
   // Gửi tin nhắn
   const handleSendMessage = async (query = input) => {
-    if (!query.trim()) return;
+    if (!query.trim() || isLoading) return;
 
     // Add user message
     const userMessage = {
@@ -27,15 +29,39 @@ export default function ChatBotScreen() {
       text: query,
       isBot: false,
     };
-    setMessages([...messages, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setIsLoading(true);
 
     try {
-      const response = await chatbotAPI.sendMessage(query);
+      // Gọi API với conversation_id để giữ context
+      const response = await chatbotAPI.sendMessage(query, conversationId);
+      
+      // Lưu conversation_id từ lần đầu
+      if (!conversationId && response.conversation_id) {
+        setConversationId(response.conversation_id);
+      }
+      
       // Thêm tin nhắn bot vào history
-      setMessages(prev => [...prev, response]);
+      const botMessage = {
+        id: messages.length + 2,
+        text: response.bot_response,
+        isBot: true,
+        timestamp: response.timestamp,
+      };
+      setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      console.error('Error:', error.error);
+      console.error('Chatbot error:', error);
+      
+      // Hiển thị lỗi cho user
+      const errorMessage = {
+        id: messages.length + 2,
+        text: `❌ Lỗi: ${error.error || error.message || 'Không thể kết nối với chatbot'}`,
+        isBot: true,
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -108,11 +134,15 @@ export default function ChatBotScreen() {
             maxHeight={100}
           />
           <TouchableOpacity
-            style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
+            style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]}
             onPress={() => handleSendMessage()}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
           >
-            <Ionicons name="send" size={20} color="#fff" />
+            {isLoading ? (
+              <Text style={{ color: '#fff', fontSize: 12 }}>...</Text>
+            ) : (
+              <Ionicons name="send" size={20} color="#fff" />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
