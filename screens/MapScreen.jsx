@@ -1,19 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Animated, Dimensions, ScrollView } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, TouchableOpacity, Text, Animated, Dimensions, ScrollView } from 'react-native';
 import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as Location from 'expo-location';
 
-const TOMTOM_API_KEY = 'yyxXlbgc7wMsUKBZY88fGXiCqM0IHspm';
 const BACKEND_BASE_URL = 'http://192.168.1.2:5000/api';
 
-export default function MapScreen({ navigation }) {
+export default function MapScreen({ navigation, route }) {
   // ===== LOCATION & MAP STATE =====
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
-  const [query, setQuery] = useState('');
 
   // ===== BACKEND DATA STATE =====
   const [restaurants, setRestaurants] = useState([]);
@@ -91,6 +89,9 @@ export default function MapScreen({ navigation }) {
 
       const response = await axios.post(`${BACKEND_BASE_URL}/map/filter`, requestBody, {
         timeout: 5000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.data.success) {
@@ -189,74 +190,86 @@ export default function MapScreen({ navigation }) {
     }
   }, [filterRadius, filterMinPrice, filterMaxPrice, filterMinRating, filterMaxRating, filterTags, chkDry, chkSoup, chkVegetarian, chkSalty, chkSeafood]);
 
-  // ===== TOMTOM API FUNCTIONS =====
-  // 🔍 Search for locations using TomTom Search API
-  const handleSearch = async () => {
-    if (!query.trim()) return;
-
-    try {
-      const res = await axios.get(
-        `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(query)}.json?key=${TOMTOM_API_KEY}`
-      );
-
-      const result = res.data.results[0];
-      if (!result) {
-        Alert.alert('Không tìm thấy địa điểm');
-        return;
-      }
-
-      const { lat, lon } = result.position;
-      const dest = { latitude: lat, longitude: lon };
-      setDestination(dest);
-
-      if (mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude: lat,
-          longitude: lon,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }, 1500);
-      }
-    } catch (err) {
-      console.error('TomTom search error:', err.response?.data || err.message);
-      Alert.alert('Lỗi khi tìm kiếm địa điểm');
+  // ===== LISTEN FOR DESTINATION FROM RESTAURANT DETAIL =====
+  /**
+   * When user taps "Chỉ đường" button in RestaurantDetail,
+   * route.params contains destination: { latitude, longitude }
+   * This useEffect automatically fetches route when both destination and userLocation exist
+   */
+  useEffect(() => {
+    if (route.params?.destination && userLocation) {
+      console.log('📍 Received destination from RestaurantDetail:', route.params.destination);
+      setDestination(route.params.destination);
+      // Clear route.params to prevent re-triggering
+      navigation.setParams({ destination: undefined });
     }
-  };
+  }, [route.params?.destination, userLocation, navigation]);
 
-  // 🧭 Get directions using TomTom Routing API
-  const handleRoute = async () => {
+  // ===== AUTO-FETCH ROUTE WHEN DESTINATION CHANGES =====
+  /**
+   * When destination state updates, automatically call backend to get route
+   */
+  useEffect(() => {
+    if (destination && userLocation) {
+      console.log('🗺️ Fetching route for destination:', destination);
+      fetchRouteFromBackend();
+    }
+  }, [destination]);
+
+  // ===== LIFECYCLE: Initialize location + fetch restaurants =====
+  const fetchRouteFromBackend = async () => {
     if (!userLocation || !destination) {
-      Alert.alert('Vui lòng bật định vị và chọn điểm đến trước');
+      Alert.alert('Lỗi', 'Vui lòng chọn điểm đến');
       return;
     }
 
     // Check if coordinates are too close
     if (Math.abs(userLocation.latitude - destination.latitude) < 0.0001 &&
         Math.abs(userLocation.longitude - destination.longitude) < 0.0001) {
-      Alert.alert('Vị trí hiện tại và điểm đến quá gần — không thể tạo tuyến đường.');
+      Alert.alert('Lỗi', 'Vị trí hiện tại và điểm đến quá gần');
       return;
     }
 
     try {
-      const url = `https://api.tomtom.com/routing/1/calculateRoute/${userLocation.longitude},${userLocation.latitude}:${destination.longitude},${destination.latitude}/json?key=${TOMTOM_API_KEY}`;
+      const requestBody = {
+        start_lat: userLocation.latitude,
+        start_lon: userLocation.longitude,
+        end_lat: destination.latitude,
+        end_lon: destination.longitude,
+      };
 
-      const res = await axios.get(url);
+      console.log('📤 Requesting route from backend:', requestBody);
 
-      if (!res.data.routes || res.data.routes.length === 0) {
-        Alert.alert('Không tìm thấy đường đi.');
-        return;
+      const response = await axios.post(`${BACKEND_BASE_URL}/get-route`, requestBody, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.data.success) {
+        console.log(`✅ Received route with ${response.data.total_points} points`);
+        setRouteCoords(response.data.coordinates || []);
+      } else {
+        Alert.alert('Lỗi', response.data.message || 'Không thể tính toán tuyến đường');
+        setRouteCoords([]);
       }
-
-      const points = res.data.routes[0].legs[0].points.map(p => ({
-        latitude: p.latitude,
-        longitude: p.longitude,
-      }));
-
-      setRouteCoords(points);
-    } catch (err) {
-      console.error('TomTom route error:', err.message);
-      Alert.alert('Không thể lấy chỉ đường', err.message);
+    } catch (error) {
+      console.error('❌ Route calculation error:', error.message);
+      Alert.alert('Lỗi kết nối', `Không thể lấy chỉ đường: ${error.message}`);
+      setRouteCoords([]);
     }
+  };
+
+  // ===== CLEAR NAVIGATION =====
+  /**
+   * Cancel navigation mode: clear route and destination
+   * Removes Polyline from map
+   */
+  const cancelNavigation = () => {
+    console.log('🛑 Canceling navigation');
+    setRouteCoords([]);
+    setDestination(null);
   };
 
   // Navigate to restaurant detail screen
@@ -323,23 +336,23 @@ export default function MapScreen({ navigation }) {
         </View>
       )}
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Nhập tên quán ăn..."
-          value={query}
-          onChangeText={setQuery}
-        />
-        <Button title="Tìm" onPress={handleSearch} />
-        <Button title="Chỉ đường" onPress={handleRoute} />
-      </View>
-
       {loadingRestaurants && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#2196F3" />
           <Text style={styles.loadingText}>Đang tải nhà hàng...</Text>
         </View>
       )}
+
+      {/* Cancel Navigation Button - appears when route is active */}
+      {routeCoords.length > 0 && (
+        <TouchableOpacity 
+          style={styles.cancelNavButton} 
+          onPress={cancelNavigation}
+        >
+          <Text style={styles.cancelNavButtonText}>✕ Hủy Chỉ Đường</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Hamburger menu, giờ nằm dưới search bar và align trái với searchContainer */}
       <TouchableOpacity style={[styles.hamburger, { top: hamburgerTop, left: searchLeft }]} onPress={openMenu}>
          <View style={styles.hbLine} />
@@ -475,50 +488,6 @@ export default function MapScreen({ navigation }) {
      justifyContent: 'center',
    },
    closeTxt: { fontSize: 18, color: '#333' },
-   searchContainer: {
-     position: 'absolute',
-     top: 40,
-     width: '90%',
-     alignSelf: 'center',
-     flexDirection: 'row',
-     backgroundColor: 'white',
-     borderRadius: 10,
-     padding: 5,
-     elevation: 5,
-     justifyContent: 'space-between',
-   },
-   // Container cho nút filter, nằm ngay dưới searchContainer và cùng căn lề
-   filterContainer: {
-     position: 'absolute',
-     top: 40 + 60, // dưới searchContainer (searchContainer khoảng 48px cao)
-     width: '90%',
-     alignSelf: 'center',
-     flexDirection: 'row',
-     justifyContent: 'flex-start',
-     paddingHorizontal: 5,
-     zIndex: 10,
-   },
-   input: {
-     flex: 1,
-     marginRight: 5,
-     padding: 5,
-   },
-   modeButton: {
-     paddingHorizontal: 12,
-     paddingVertical: 8,
-     borderRadius: 8,
-     elevation: 6,
-   },
-   modeButtonText: {
-     color: '#000',
-     fontWeight: '700',
-   },
-   modeButtonInline: {
-     paddingHorizontal: 12,
-     paddingVertical: 8,
-     borderRadius: 8,
-     elevation: 6,
-   },
    calloutContainer: {
      padding: 12,
      backgroundColor: '#fff',
@@ -571,5 +540,26 @@ export default function MapScreen({ navigation }) {
      fontSize: 14,
      color: '#fff',
      fontWeight: '600',
+   },
+   cancelNavButton: {
+     position: 'absolute',
+     bottom: 20,
+     alignSelf: 'center',
+     backgroundColor: '#FF3B30',
+     paddingHorizontal: 24,
+     paddingVertical: 12,
+     borderRadius: 8,
+     elevation: 5,
+     zIndex: 50,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.3,
+     shadowRadius: 3,
+   },
+   cancelNavButtonText: {
+     color: '#fff',
+     fontSize: 14,
+     fontWeight: '700',
+     textAlign: 'center',
    },
  });
