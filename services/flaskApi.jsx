@@ -1,9 +1,11 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi 401
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:5000/api';
+// ⭐️ CẬP NHẬT IP CUỐI CÙNG (192.168.1.22) ⭐️
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.22:5000/api'; 
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
 const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
@@ -39,22 +41,24 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Token hết hạn hoặc invalid
+    const status = error.response?.status;
+
+    if (status === 401) {
+      // Token hết hạn hoặc invalid (Cần xóa token và đăng nhập lại)
       await AsyncStorage.removeItem('authToken');
-      // TODO: Navigate về LoginScreen
+      // Thường sẽ để AuthContext xử lý việc redirect, nhưng có thể thêm logic cảnh báo.
+      Alert.alert("Phiên hết hạn", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
     }
 
     // Xử lý các loại lỗi khác nhau
     if (!error.response) {
-      // Network error - in ra chi tiết
+      // Network error - Lỗi kết nối
       console.error('❌ Network error:', error.message);
-      console.error('🔗 API URL:', BASE_URL);
       error.message = 'Lỗi kết nối. Kiểm tra:\n1. Backend có đang chạy không?\n2. IP đúng không? (' + BASE_URL + ')\n3. Device có cùng WiFi không?';
-    } else if (error.response.status === 500) {
+    } else if (status === 500) {
       error.message = 'Lỗi server: ' + (error.response.data?.error || 'Unknown error');
     } else if (error.response.data?.error) {
-      // Giữ lỗi từ backend
+      // Giữ lỗi từ backend (ví dụ: Sai email/mật khẩu, Email chưa xác thực)
       error.message = error.response.data.error;
     }
 
@@ -66,18 +70,13 @@ apiClient.interceptors.response.use(
 export const authAPI = {
   register: async (email, password, name) => {
     try {
-      const response = await apiClient.post('/register', {
-        email,
-        password,
-        name,
+      const response = await apiClient.post('/user/register', {
+        email, password, name,
       });
-      
-      // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.token || response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
-      
       return response.data;
     } catch (error) {
       console.error('Register error:', error);
@@ -87,12 +86,11 @@ export const authAPI = {
 
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('/login', {
+      const response = await apiClient.post('/user/login', {
         email,
         password,
       });
       
-      // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.token || response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
@@ -105,9 +103,21 @@ export const authAPI = {
     }
   },
 
+  // ⭐️ BỔ SUNG CHO AuthContext: Lấy Profile ⭐️
+  getProfile: async () => {
+    try {
+      // AuthContext gọi hàm này, dùng endpoint /user/profile
+      const response = await apiClient.get('/user/profile'); 
+      return response.data.user; // Trả về đối tượng user
+    } catch (error) {
+      console.error('Get profile error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
   logout: async () => {
     try {
-      await apiClient.post('/auth/logout');
+      await apiClient.post('/user/auth/logout');
     } finally {
       await AsyncStorage.removeItem('authToken');
     }
@@ -115,7 +125,7 @@ export const authAPI = {
 
   changePassword: async (oldPassword, newPassword) => {
     try {
-      const response = await apiClient.put('/auth/change-password', {
+      const response = await apiClient.put('/user/auth/change-password', {
         oldPassword,
         newPassword,
       });
@@ -128,7 +138,7 @@ export const authAPI = {
 
   resetPassword: async (email, newPassword) => {
     try {
-      const response = await apiClient.post('/auth/reset-password', {
+      const response = await apiClient.post('/user/auth/reset-password', {
         email,
         newPassword,
       });
@@ -141,7 +151,7 @@ export const authAPI = {
 
   verifyEmail: async (email, code) => {
     try {
-      const response = await apiClient.post('/verify', {
+      const response = await apiClient.post('/user/verify', {
         email,
         code,
       });
@@ -154,7 +164,7 @@ export const authAPI = {
 
   refreshToken: async () => {
     try {
-      const response = await apiClient.post('/auth/refresh');
+      const response = await apiClient.post('/user/auth/refresh');
       if (response.data?.token) {
         await AsyncStorage.setItem('authToken', response.data.token);
       }
@@ -168,24 +178,26 @@ export const authAPI = {
 
 // ============ USER PROFILE ENDPOINTS ============
 export const userAPI = {
+  // Lấy Profile (Dùng cùng endpoint với authAPI.getProfile())
   getProfile: async () => {
     try {
-      const response = await apiClient.get('/users/profile');
+      const response = await apiClient.get('/user/profile');
       return response.data;
     } catch (error) {
       console.error('Get profile error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
-
+  
   updateProfile: async (userData) => {
     try {
-      const response = await apiClient.put('/users/profile', userData);
+      const response = await apiClient.put('/user/profile', userData);
       return response.data;
     } catch (error) {
       console.error('Update profile error:', error);
       throw error.response?.data || { error: error.message };
     }
+    
   },
 
   uploadAvatar: async (imageUri) => {
@@ -197,7 +209,7 @@ export const userAPI = {
         name: `avatar_${Date.now()}.jpg`,
       });
 
-      const response = await apiClient.post('/users/avatar', formData, {
+      const response = await apiClient.post('/user/avatar', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -211,7 +223,7 @@ export const userAPI = {
 
   deleteAccount: async () => {
     try {
-      const response = await apiClient.delete('/users/account');
+      const response = await apiClient.delete('/user/account');
       await AsyncStorage.removeItem('authToken');
       return response.data;
     } catch (error) {
@@ -225,7 +237,7 @@ export const userAPI = {
 export const restaurantAPI = {
   getAll: async (filters = {}) => {
     try {
-      const response = await apiClient.get('/restaurants', { params: filters });
+      const response = await apiClient.get('/food/restaurants', { params: filters });
       return response.data;
     } catch (error) {
       console.error('Get restaurants error:', error);
@@ -235,7 +247,7 @@ export const restaurantAPI = {
 
   getById: async (id) => {
     try {
-      const response = await apiClient.get(`/restaurants/${id}`);
+      const response = await apiClient.get(`/food/restaurants/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get restaurant error:', error);
@@ -245,7 +257,7 @@ export const restaurantAPI = {
 
   search: async (query) => {
     try {
-      const response = await apiClient.get('/restaurants/search', {
+      const response = await apiClient.get('/food/restaurants/search', {
         params: { q: query },
       });
       return response.data;
@@ -257,7 +269,7 @@ export const restaurantAPI = {
 
   getNearby: async (latitude, longitude, radius = 5000) => {
     try {
-      const response = await apiClient.get('/restaurants/nearby', {
+      const response = await apiClient.get('/food/restaurants/nearby', {
         params: { latitude, longitude, radius },
       });
       return response.data;
@@ -269,20 +281,46 @@ export const restaurantAPI = {
 
   getByCategory: async (categoryId) => {
     try {
-      const response = await apiClient.get(`/restaurants/category/${categoryId}`);
+      const response = await apiClient.get(`/food/restaurants/category/${categoryId}`);
       return response.data;
     } catch (error) {
       console.error('Get restaurants by category error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
+
+  // ⭐️ HÀM MỚI: Lấy tất cả nhà hàng (thay thế cho TomTom) ⭐️
+  getAllRestaurants: async (query = '') => {
+    try {
+      // Gọi endpoint /food/restaurants hoặc /food/restaurants/search?q=...
+      const endpoint = query ? `/food/restaurants/search?q=${query}` : '/food/restaurants';
+      const response = await apiClient.get(endpoint);
+      
+      // Trả về mảng restaurants
+      return response.data.restaurants; 
+      
+    } catch (error) {
+      console.error('Get all restaurants error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+      // ⭐️ HÀM MỚI: Lấy chi tiết nhà hàng dựa trên ID ⭐️
+    getDetailsByIds: async (ids) => {
+        try {
+            const response = await apiClient.post('/food/restaurants/details-by-ids', { ids });
+            return response.data.restaurants; 
+        } catch (error) {
+            console.error('Get details by IDs error:', error);
+            throw error.response?.data || { error: error.message };
+        }
+    },
 };
 
 // ============ FOOD/DISH ENDPOINTS ============
 export const foodAPI = {
   getAll: async (filters = {}) => {
     try {
-      const response = await apiClient.get('/foods', { params: filters });
+      const response = await apiClient.get('/food/foods', { params: filters });
       return response.data;
     } catch (error) {
       console.error('Get foods error:', error);
@@ -292,7 +330,7 @@ export const foodAPI = {
 
   getById: async (id) => {
     try {
-      const response = await apiClient.get(`/foods/${id}`);
+      const response = await apiClient.get(`/food/foods/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get food error:', error);
@@ -302,7 +340,7 @@ export const foodAPI = {
 
   search: async (query) => {
     try {
-      const response = await apiClient.get('/foods/search', {
+      const response = await apiClient.get('/food/foods/search', {
         params: { q: query },
       });
       return response.data;
@@ -314,7 +352,7 @@ export const foodAPI = {
 
   getByCategory: async (categoryId) => {
     try {
-      const response = await apiClient.get(`/foods/category/${categoryId}`);
+      const response = await apiClient.get(`/food/foods/category/${categoryId}`);
       return response.data;
     } catch (error) {
       console.error('Get foods by category error:', error);
@@ -324,7 +362,7 @@ export const foodAPI = {
 
   getByRestaurant: async (restaurantId) => {
     try {
-      const response = await apiClient.get(`/foods/restaurant/${restaurantId}`);
+      const response = await apiClient.get(`/food/foods/restaurant/${restaurantId}`);
       return response.data;
     } catch (error) {
       console.error('Get foods by restaurant error:', error);
@@ -335,16 +373,32 @@ export const foodAPI = {
 
 // ============ FAVORITES ENDPOINTS ============
 export const favoriteAPI = {
+  // ⭐️ HÀM ĐÃ SỬA: toggleRestaurantFavorite ⭐️
+  toggleRestaurantFavorite: async (restaurant_id) => {
+    try {
+      const response = await apiClient.post('/user/favorite/toggle-restaurant', {
+        // Gửi ID dưới dạng string để đồng bộ với Backend
+        restaurant_id: String(restaurant_id), 
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Toggle favorite restaurant error:', error.response?.data || error.message);
+      // Ném lỗi để UI có thể bắt được và hiển thị
+      throw error.response?.data || { error: error.message };
+    }
+  },
+    
   getAll: async () => {
     try {
-      const response = await apiClient.get('/favorites');
+      const response = await apiClient.get('/user/favorite/view');
       return response.data;
     } catch (error) {
       console.error('Get favorites error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
-
+  
+  // Hàm add cũ (dành cho foodId, giữ lại cho tính đầy đủ)
   add: async (foodId) => {
     try {
       const response = await apiClient.post('/favorites', { foodId });
@@ -380,7 +434,8 @@ export const favoriteAPI = {
 export const reviewAPI = {
   getByRestaurant: async (restaurantId) => {
     try {
-      const response = await apiClient.get(`/reviews/restaurant/${restaurantId}`);
+      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
+      const response = await apiClient.get(`/food/reviews/restaurant/${restaurantId}`);
       return response.data;
     } catch (error) {
       console.error('Get restaurant reviews error:', error);
@@ -390,7 +445,8 @@ export const reviewAPI = {
 
   getByFood: async (foodId) => {
     try {
-      const response = await apiClient.get(`/reviews/food/${foodId}`);
+      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
+      const response = await apiClient.get(`/food/reviews/food/${foodId}`);
       return response.data;
     } catch (error) {
       console.error('Get food reviews error:', error);
@@ -400,7 +456,8 @@ export const reviewAPI = {
 
   create: async (reviewData) => {
     try {
-      const response = await apiClient.post('/reviews', reviewData);
+      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
+      const response = await apiClient.post('/food/reviews', reviewData);
       return response.data;
     } catch (error) {
       console.error('Create review error:', error);
@@ -410,7 +467,8 @@ export const reviewAPI = {
 
   update: async (id, reviewData) => {
     try {
-      const response = await apiClient.put(`/reviews/${id}`, reviewData);
+      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
+      const response = await apiClient.put(`/food/reviews/${id}`, reviewData);
       return response.data;
     } catch (error) {
       console.error('Update review error:', error);
@@ -420,7 +478,8 @@ export const reviewAPI = {
 
   delete: async (id) => {
     try {
-      const response = await apiClient.delete(`/reviews/${id}`);
+      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
+      const response = await apiClient.delete(`/food/reviews/${id}`);
       return response.data;
     } catch (error) {
       console.error('Delete review error:', error);

@@ -12,14 +12,16 @@ import {
 } from "react-native";
 import BannerCarousel from "../components/BannerCarousel";
 import * as Location from "expo-location";
-import { searchNearbyPlaces } from "../services/tomtomApi";
+// ⭐️ SỬA IMPORT ⭐️
+import { restaurantAPI } from "../services/flaskApi"; // ⬅️ THÊM IMPORT NÀY
+// XÓA: import { searchNearbyPlaces } from "../services/tomtomApi"; 
+// XÓA: import { normalizeResults, PROVINCES, searchByProvince, searchByQuery } from "../services/homeService"; 
 import { SafeAreaView } from "react-native-safe-area-context";
 import HomeHeader from "../components/HomeHeader";
 import FilterDropdown from "../components/FilterDropdown";
 import CategorySection from "../components/CategorySection";
 import MapSection from "../components/MapSection";
 import NearbyList from "../components/NearbyList";
-import { normalizeResults, PROVINCES, searchByProvince, searchByQuery } from "../services/homeService";
 import { useHeaderAnimation } from "../hooks/useHeaderAnimation";
 
 export default function HomeScreen({ navigation, route }) {
@@ -45,32 +47,41 @@ export default function HomeScreen({ navigation, route }) {
 
   const shownPlaces = (filteredPlaces !== null ? filteredPlaces : places).slice(0, 10);
 
-  const handleFilterSelect = async (provinceId) => {
-    setDropdownVisible(false);
-    setLoading(true);
-    try {
-      const normalized = await searchByProvince(provinceId);
-      setPlaces(normalized);
-    } catch (err) {
-      console.warn('Filter search error', err);
-      setPlaces([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // XÓA: handleFilterSelect cũ vì không còn dùng searchByProvince
+  // const handleFilterSelect = async (provinceId) => {
+  //   setDropdownVisible(false);
+  //   setLoading(true);
+  //   try {
+  //     const normalized = await searchByProvince(provinceId);
+  //     setPlaces(normalized);
+  //   } catch (err) {
+  //     console.warn('Filter search error', err);
+  //     setPlaces([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
+  // ⭐️ THAY THẾ LOGIC TẢI DỮ LIỆU BAN ĐẦU ⭐️
   useEffect(() => {
     (async () => {
       setLoading(true);
+      // Lấy vị trí người dùng (chỉ để truyền tham số, không còn dùng cho TomTom)
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setLoading(false);
-        return;
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({});
+        // Lưu vị trí người dùng
+        setUserLoc({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       }
-      const loc = await Location.getCurrentPositionAsync({});
-      setUserLoc({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      const data = await searchNearbyPlaces({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      setPlaces(data || []);
+      
+      // ⭐️ GỌI API THẬT ĐỂ LẤY DỮ LIỆU BAN ĐẦU ⭐️
+      try {
+          const data = await restaurantAPI.getAllRestaurants();
+          setPlaces(data || []);
+      } catch (e) {
+          console.error("Initial load error:", e);
+          setPlaces([]);
+      }
       setLoading(false);
     })();
   }, []);
@@ -82,16 +93,20 @@ export default function HomeScreen({ navigation, route }) {
     }
   }, [route.params?.selectedCategory]);
 
+  // ⭐️ THAY THẾ LOGIC TÌM KIẾM ⭐️
   const doSearch = async (text) => {
     if (!text) return;
     setQuery(text);
     setLoading(true);
     try {
-      const mapped = await searchByQuery(text, userLoc);
+      // ⭐️ DÙNG restaurantAPI.getAllRestaurants(query) ⭐️
+      const mapped = await restaurantAPI.getAllRestaurants(text); 
       setPlaces(mapped);
 
+      // Cập nhật Map (Giữ nguyên logic animateToRegion)
       if (mapped && mapped.length > 0) {
-        const first = mapped[0].position;
+        // Giả định đối tượng restaurant (first) từ backend đã có các thuộc tính 'lat' và 'lon'
+        const first = mapped[0]; 
         if (mapRef.current && typeof mapRef.current.animateToRegion === "function") {
           try {
             mapRef.current.animateToRegion(
@@ -120,7 +135,28 @@ export default function HomeScreen({ navigation, route }) {
     setSelectedCategory(name);
     doSearch(name);
   };
+  
+  // ⭐️ THÊM HÀM REFRESH MỚI ⭐️
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+        // Tải lại toàn bộ danh sách (không query, không lọc)
+        const data = await restaurantAPI.getAllRestaurants();
+        setPlaces(data);
+    } catch (e) {
+        console.error("Refresh error:", e);
+        setPlaces([]);
+    } finally {
+        setLoading(false);
+    }
+  }
 
+  // Tạm thời vô hiệu hóa lọc tỉnh thành vì đã xóa hàm handleFilterSelect
+  const handleFilterSelect = (provinceId) => {
+    setDropdownVisible(false);
+    console.warn(`Filtering by province ${provinceId} is temporarily disabled.`);
+  }
+  
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -138,7 +174,8 @@ export default function HomeScreen({ navigation, route }) {
           onSubmitSearch={(q) => doSearch(q)}
           onQueryChange={(t) => setQuery(t)}
           onOpenProfile={() => navigation.navigate("ProfileStack")}
-          onOpenFilter={() => setDropdownVisible(true)}
+          // Giữ lại nút filter nhưng hàm handleFilterSelect bị vô hiệu hóa
+          onOpenFilter={() => setDropdownVisible(true)} 
         />
       </Animated.View>
 
@@ -155,15 +192,7 @@ export default function HomeScreen({ navigation, route }) {
           <ScrollView showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} refreshControl={
             <RefreshControl
               refreshing={loading}
-              onRefresh={async () => {
-                setLoading(true);
-                const data = await searchNearbyPlaces({
-                  latitude: userLoc.latitude,
-                  longitude: userLoc.longitude,
-                });
-                setPlaces(data);
-                setLoading(false);
-              }}
+              onRefresh={handleRefresh} // ⭐️ SỬ DỤNG HÀM REFRESH MỚI ⭐️
               colors={["#ff6347"]}
             />
           }>
