@@ -48,16 +48,6 @@ export default function ProfileScreen() {
             console.log("Lỗi logout:", error);
         }
     };
-    //-----
-    const handleEmergencyReset = async () => {
-        try {
-            await AsyncStorage.clear(); // Xóa sạch sành sanh bộ nhớ
-            alert("Đã xóa sạch dữ liệu! Vui lòng tắt app và mở lại.");
-        } catch (e) {
-            alert("Lỗi xóa data: " + e.message);
-        }
-    };
-    //-----
     return (
         <SafeAreaView style={styles.container}>
             {/* Header */}
@@ -108,15 +98,6 @@ export default function ProfileScreen() {
                             <Ionicons name="log-out-outline" size={22} color="red" />
                             <Text style={[styles.optionText, { color: "red" }]}>Đăng xuất</Text>
                         </View>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.optionItem, { backgroundColor: 'yellow' }]}
-                        onPress={handleEmergencyReset}
-                    >
-                        <Text style={{ color: 'red', fontWeight: 'bold', padding: 10 }}>
-                            ⚠️ CẤP CỨU: RESET APP DATA
-                        </Text>
                     </TouchableOpacity>
 
                 </View>
