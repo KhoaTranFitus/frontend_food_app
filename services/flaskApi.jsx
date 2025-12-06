@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.2:5000/api';
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.100.193:5000/api';
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
 const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
@@ -62,6 +62,14 @@ apiClient.interceptors.response.use(
   }
 );
 
+const getUserId = async () => {
+    try {
+        const jsonValue = await AsyncStorage.getItem('user_data');
+        const user = jsonValue != null ? JSON.parse(jsonValue) : null;
+        return user?.uid || null;
+    } catch (e) { return null; }
+};
+
 // ============ AUTHENTICATION ENDPOINTS ============
 export const authAPI = {
   register: async (email, password, name) => {
@@ -93,17 +101,24 @@ export const authAPI = {
       });
       
       // Lưu token - backend có thể trả token, idToken, hoặc không trả
-      const token = response.data?.token || response.data?.idToken;
-      if (token) {
-        await AsyncStorage.setItem('authToken', token);
-      }
-      
-      return response.data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+            const token = response.data?.idToken || response.data?.token;
+            if (token) {
+                await AsyncStorage.setItem('authToken', token);
+            }
+
+            // 2. LƯU THÔNG TIN USER (QUAN TRỌNG ĐỂ PROFILE HIỂN THỊ)
+            if (response.data?.user) {
+                console.log("Đang lưu user data:", response.data.user); // Log để kiểm tra
+                await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
+            }
+            // ----------------------------------
+
+            return response.data;
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error.response?.data || { error: error.message };
+        }
+    },
 
   logout: async () => {
     try {
@@ -168,57 +183,77 @@ export const authAPI = {
 
 // ============ USER PROFILE ENDPOINTS ============
 export const userAPI = {
-  getProfile: async () => {
-    try {
-      const response = await apiClient.get('/users/profile');
-      return response.data;
-    } catch (error) {
-      console.error('Get profile error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+    // 1. Lấy thông tin User
+    getProfile: async (userId) => {
+        // Backend mình dùng route /favorite/view để lấy info user kèm danh sách yêu thích
+        // Hoặc nếu bạn đã login, ta có thể lấy từ AsyncStorage.
+        // Để chắc ăn, ta gọi API check user
+        try {
+            // Tạm thời backend chưa có route get-profile riêng biệt, 
+            // ta dùng dữ liệu lưu trong AsyncStorage khi Login thành công.
+            const jsonValue = await AsyncStorage.getItem('user_data');
+            return jsonValue != null ? JSON.parse(jsonValue) : null;
+        } catch (error) {
+            throw error;
+        }
+    },
 
-  updateProfile: async (userData) => {
-    try {
-      const response = await apiClient.put('/users/profile', userData);
-      return response.data;
-    } catch (error) {
-      console.error('Update profile error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+    // 2. Cập nhật Tên và Avatar
+    updateProfile: async (name, avatar_url) => {
+        const uid = await getUserId();
+        if (!uid) throw new Error("Không tìm thấy User ID");
 
-  uploadAvatar: async (imageUri) => {
-    try {
-      const formData = new FormData();
-      formData.append('avatar', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: `avatar_${Date.now()}.jpg`,
-      });
+        try {
+            const response = await apiClient.post('/user/update-profile', {
+                uid,
+                name,
+                avatar_url // Gửi chuỗi base64 hoặc link ảnh
+            });
 
-      const response = await apiClient.post('/users/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Upload avatar error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+            // Cập nhật lại AsyncStorage để app hiển thị đúng ngay lập tức
+            const currentUser = await userAPI.getProfile();
+            const newUser = { ...currentUser, ...response.data.user };
+            await AsyncStorage.setItem('user_data', JSON.stringify(newUser));
 
-  deleteAccount: async () => {
-    try {
-      const response = await apiClient.delete('/users/account');
-      await AsyncStorage.removeItem('authToken');
-      return response.data;
-    } catch (error) {
-      console.error('Delete account error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: error.message };
+        }
+    },
+
+    // 3. Đổi mật khẩu (Cần mật khẩu cũ)
+    changePassword: async (oldPassword, newPassword) => {
+        const uid = await getUserId();
+        if (!uid) throw new Error("Không tìm thấy User ID");
+
+        try {
+            const response = await apiClient.post('/user/update-password', {
+                uid,
+                old_password: oldPassword,
+                new_password: newPassword
+            });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: error.message };
+        }
+    },
+
+    // 4. Đổi Email (Cần mật khẩu xác nhận)
+    changeEmail: async (password, newEmail) => {
+        const uid = await getUserId();
+        if (!uid) throw new Error("Không tìm thấy User ID");
+
+        try {
+            const response = await apiClient.post('/user/update-email', {
+                uid,
+                password: password,
+                new_email: newEmail
+            });
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || { error: error.message };
+        }
+    },
 };
 
 // ============ RESTAURANT ENDPOINTS ============
