@@ -4,7 +4,6 @@ import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-// ⭐️ CẬP NHẬT IP CUỐI CÙNG (192.168.1.22) ⭐️
 const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.22:5000/api'; 
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
@@ -44,21 +43,16 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401) {
-      // Token hết hạn hoặc invalid (Cần xóa token và đăng nhập lại)
       await AsyncStorage.removeItem('authToken');
-      // Thường sẽ để AuthContext xử lý việc redirect, nhưng có thể thêm logic cảnh báo.
       Alert.alert("Phiên hết hạn", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
     }
 
-    // Xử lý các loại lỗi khác nhau
     if (!error.response) {
-      // Network error - Lỗi kết nối
       console.error('❌ Network error:', error.message);
       error.message = 'Lỗi kết nối. Kiểm tra:\n1. Backend có đang chạy không?\n2. IP đúng không? (' + BASE_URL + ')\n3. Device có cùng WiFi không?';
     } else if (status === 500) {
       error.message = 'Lỗi server: ' + (error.response.data?.error || 'Unknown error');
     } else if (error.response.data?.error) {
-      // Giữ lỗi từ backend (ví dụ: Sai email/mật khẩu, Email chưa xác thực)
       error.message = error.response.data.error;
     }
 
@@ -103,10 +97,8 @@ export const authAPI = {
     }
   },
 
-  // ⭐️ BỔ SUNG CHO AuthContext: Lấy Profile ⭐️
   getProfile: async () => {
     try {
-      // AuthContext gọi hàm này, dùng endpoint /user/profile
       const response = await apiClient.get('/user/profile'); 
       return response.data.user; // Trả về đối tượng user
     } catch (error) {
@@ -178,7 +170,6 @@ export const authAPI = {
 
 // ============ USER PROFILE ENDPOINTS ============
 export const userAPI = {
-  // Lấy Profile (Dùng cùng endpoint với authAPI.getProfile())
   getProfile: async () => {
     try {
       const response = await apiClient.get('/user/profile');
@@ -289,14 +280,11 @@ export const restaurantAPI = {
     }
   },
 
-  // ⭐️ HÀM MỚI: Lấy tất cả nhà hàng (thay thế cho TomTom) ⭐️
   getAllRestaurants: async (query = '') => {
     try {
-      // Gọi endpoint /food/restaurants hoặc /food/restaurants/search?q=...
       const endpoint = query ? `/food/restaurants/search?q=${query}` : '/food/restaurants';
       const response = await apiClient.get(endpoint);
       
-      // Trả về mảng restaurants
       return response.data.restaurants; 
       
     } catch (error) {
@@ -304,7 +292,7 @@ export const restaurantAPI = {
       throw error.response?.data || { error: error.message };
     }
   },
-      // ⭐️ HÀM MỚI: Lấy chi tiết nhà hàng dựa trên ID ⭐️
+      
     getDetailsByIds: async (ids) => {
         try {
             const response = await apiClient.post('/food/restaurants/details-by-ids', { ids });
@@ -373,17 +361,14 @@ export const foodAPI = {
 
 // ============ FAVORITES ENDPOINTS ============
 export const favoriteAPI = {
-  // ⭐️ HÀM ĐÃ SỬA: toggleRestaurantFavorite ⭐️
   toggleRestaurantFavorite: async (restaurant_id) => {
     try {
       const response = await apiClient.post('/user/favorite/toggle-restaurant', {
-        // Gửi ID dưới dạng string để đồng bộ với Backend
         restaurant_id: String(restaurant_id), 
       });
       return response.data;
     } catch (error) {
       console.error('Toggle favorite restaurant error:', error.response?.data || error.message);
-      // Ném lỗi để UI có thể bắt được và hiển thị
       throw error.response?.data || { error: error.message };
     }
   },
@@ -398,7 +383,6 @@ export const favoriteAPI = {
     }
   },
   
-  // Hàm add cũ (dành cho foodId, giữ lại cho tính đầy đủ)
   add: async (foodId) => {
     try {
       const response = await apiClient.post('/favorites', { foodId });
@@ -432,9 +416,19 @@ export const favoriteAPI = {
 
 // ============ REVIEWS/RATINGS ENDPOINTS ============
 export const reviewAPI = {
+  // ⭐️ [MỚI] Hàm GET Rating nhanh ⭐️
+  getRating: async (restaurantId) => {
+    try {
+      const response = await apiClient.get(`/food/rating/${restaurantId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get single rating error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
   getByRestaurant: async (restaurantId) => {
     try {
-      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
       const response = await apiClient.get(`/food/reviews/restaurant/${restaurantId}`);
       return response.data;
     } catch (error) {
@@ -445,7 +439,6 @@ export const reviewAPI = {
 
   getByFood: async (foodId) => {
     try {
-      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
       const response = await apiClient.get(`/food/reviews/food/${foodId}`);
       return response.data;
     } catch (error) {
@@ -456,7 +449,6 @@ export const reviewAPI = {
 
   create: async (reviewData) => {
     try {
-      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
       const response = await apiClient.post('/food/reviews', reviewData);
       return response.data;
     } catch (error) {
@@ -467,7 +459,6 @@ export const reviewAPI = {
 
   update: async (id, reviewData) => {
     try {
-      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
       const response = await apiClient.put(`/food/reviews/${id}`, reviewData);
       return response.data;
     } catch (error) {
@@ -476,10 +467,11 @@ export const reviewAPI = {
     }
   },
 
-  delete: async (id) => {
+  delete: async (reviewId) => {
     try {
-      // ⭐️ SỬA LỖI: THÊM TIỀN TỐ /food ⭐️
-      const response = await apiClient.delete(`/food/reviews/${id}`);
+      // Đảm bảo reviewId là chuỗi và đã được làm sạch
+      const cleanReviewId = String(reviewId).trim(); 
+      const response = await apiClient.delete(`/food/reviews/${cleanReviewId}`);
       return response.data;
     } catch (error) {
       console.error('Delete review error:', error);
@@ -513,7 +505,6 @@ export const categoryAPI = {
 
 // ============ CHATBOT ENDPOINTS ============
 export const chatbotAPI = {
-  // Gửi tin nhắn và nhận phản hồi từ chatbot
   sendMessage: async (message) => {
     try {
       const response = await apiClient.post('/chatbot', {
@@ -526,7 +517,6 @@ export const chatbotAPI = {
     }
   },
 
-  // Lấy lịch sử chat của user
   getChatHistory: async (limit = 50) => {
     try {
       const response = await apiClient.get('/chatbot/history', {
@@ -539,7 +529,6 @@ export const chatbotAPI = {
     }
   },
 
-  // Xóa lịch sử chat
   clearChatHistory: async () => {
     try {
       const response = await apiClient.delete('/chatbot/history');
@@ -550,7 +539,6 @@ export const chatbotAPI = {
     }
   },
 
-  // Lấy gợi ý từ chatbot (ví dụ: phở, pizza, sushi, cà phê)
   getSuggestions: async () => {
     try {
       const response = await apiClient.get('/chatbot/suggestions');
@@ -561,7 +549,6 @@ export const chatbotAPI = {
     }
   },
 
-  // Tìm nhà hàng dựa trên query từ chatbot
   searchByQuery: async (query) => {
     try {
       const response = await apiClient.post('/chatbot/search', {

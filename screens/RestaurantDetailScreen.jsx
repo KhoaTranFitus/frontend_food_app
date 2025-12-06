@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; 
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TextInput, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline } from 'react-native-maps';
@@ -25,10 +25,18 @@ const COLORS = {
 
 const AVATAR_COLORS = ['#FF5733', '#33FF57', '#3357FF', '#FF33A1', '#33FFF6', '#A133FF'];
 
-const getRandomAvatarColor = () => {
-  const index = Math.floor(Math.random() * AVATAR_COLORS.length);
-  return AVATAR_COLORS[index];
+// ⭐️ [SỬA] HÀM TẠO MÀU CỐ ĐỊNH DỰA TRÊN USER ID (Deterministic Hashing) ⭐️
+const getDeterministicAvatarColor = (userId) => {
+    if (!userId) return AVATAR_COLORS[0];
+    // Tạo mã hash đơn giản bằng cách tính tổng mã ASCII và lấy modulo
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % AVATAR_COLORS.length;
+    return AVATAR_COLORS[index];
 };
+
 
 const MENU_IMAGES = [
   { id: "1", name: "Beef Wellington", image: require("../assets/beef.jpg") },
@@ -85,33 +93,38 @@ export default function RestaurantDetailScreen({ route, navigation }) {
   const [userComment, setUserComment] = useState(''); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
 
-  // [MỚI] Hàm fetch reviews 
-  const fetchReviews = async () => {
-      // Bạn có thể đặt setLoading(true) tại đây nếu cần hiển thị loading khi tải review
+  // ⭐️ [SỬA] State để lưu điểm rating sau khi tính toán (dùng điểm ban đầu) ⭐️
+  const [currentRating, setCurrentRating] = useState(parseFloat(item?.rating) || 0);
+
+  // [SỬA] Hàm fetch reviews VÀ rating
+  const fetchReviews = useCallback(async () => {
       try {
-          // Gọi API để lấy danh sách đánh giá của nhà hàng này
+          // 1. Tải đánh giá
           const result = await reviewAPI.getByRestaurant(restaurantId); 
-          
-          // Giả định backend trả về mảng reviews
           const loadedReviews = result.reviews || [];
           
-          // Thêm logic gán màu ngẫu nhiên cho avatar nếu cần (tùy chọn)
           const reviewsWithColors = loadedReviews.map(r => ({
               ...r,
-              avatarColor: getRandomAvatarColor(), 
-              // Đảm bảo rating là số để hiển thị sao
+              // ⭐️ SỬ DỤNG LOGIC MÀU CỐ ĐỊNH ⭐️
+              avatarColor: getDeterministicAvatarColor(r.user_id), 
+              avatarUrl: r.avatar_url,
               rating: parseInt(r.rating) 
           }));
           
           // Sắp xếp theo timestamp (mới nhất lên đầu)
           reviewsWithColors.sort((a, b) => b.timestamp - a.timestamp);
-          
           setReviews(reviewsWithColors);
+
+          // 2. ⭐️ CẬP NHẬT ĐIỂM RATING TỪ PHẢN HỒI BACKEND (current_rating) ⭐️
+          if (result.current_rating !== undefined && result.current_rating !== null) {
+              setCurrentRating(parseFloat(result.current_rating));
+          }
+          
       } catch (e) {
           console.error("Failed to fetch reviews:", e);
-          // Alert.alert("Lỗi tải đánh giá", "Không thể tải đánh giá từ server.");
       }
-  };
+  }, [restaurantId]);
+
 
   // ⭐️ [SỬA] Tải Vị trí người dùng VÀ Tải Đánh giá khi màn hình load ⭐️
   useEffect(() => {
@@ -133,7 +146,7 @@ export default function RestaurantDetailScreen({ route, navigation }) {
           fetchReviews();
       }
     })();
-  }, [restaurantId]);
+  }, [restaurantId, fetchReviews]); // Thêm fetchReviews làm dependency
 
 
   
@@ -203,20 +216,28 @@ export default function RestaurantDetailScreen({ route, navigation }) {
         // Gọi API để gửi đánh giá
         const result = await reviewAPI.create(reviewData); 
         
-        // Tạo đối tượng review cho UI (dùng data trả về từ backend)
+        // ⭐️ TẠO ĐỐI TƯỢNG REVIEW VỚI AVATAR VÀO LIST ⭐️
         const newReview = {
             id: result.review.id,
-            user_id: result.review.user_id, // Giữ lại id
+            user_id: result.review.user_id, 
             username: result.review.username,
             rating: result.review.rating,
             comment: result.review.comment || 'Không có bình luận',
             date: result.review.date,
-            avatarColor: getRandomAvatarColor(), // Giữ lại logic màu ngẫu nhiên cho avatar
+            // ⭐️ Dùng logic màu cố định/url từ response ⭐️
+            avatarColor: result.review.avatar_url ? null : getDeterministicAvatarColor(result.review.user_id), 
+            avatarUrl: result.review.avatar_url,
             timestamp: result.review.timestamp,
         };
 
         // Cập nhật reviews List (Thêm đánh giá mới lên đầu)
         setReviews([newReview, ...reviews]);
+        
+        // CẬP NHẬT ĐIỂM RATING TỪ PHẢN HỒI BACKEND
+        const newRating = result.review.new_restaurant_rating;
+        if (newRating !== undefined && newRating !== null) {
+            setCurrentRating(parseFloat(newRating));
+        }
         
         // Reset form
         setUserRating(0);
@@ -231,9 +252,48 @@ export default function RestaurantDetailScreen({ route, navigation }) {
         setIsSubmitting(false);
     }
   };
-  // ⭐️ KẾT THÚC LOGIC GỬI REVIEW MỚI ⭐️
+  
+  // ⭐️ [MỚI] HÀM XỬ LÝ XÓA REVIEW ⭐️
+  const handleDeleteReview = (reviewId) => {
+    Alert.alert(
+      "Xác nhận xóa",
+      "Bạn có chắc chắn muốn xóa đánh giá này không?",
+      [
+        {
+          text: "Hủy",
+          style: "cancel"
+        },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            setLoading(true); // Dùng loading chung cho toàn màn hình tạm thời
+            try {
+              const result = await reviewAPI.delete(reviewId); // Gọi API DELETE
+              
+              // Cập nhật state: Xóa review khỏi danh sách
+              setReviews(reviews.filter(r => r.id !== reviewId));
+              
+              // Cập nhật điểm rating nếu có
+              const newRating = result.new_restaurant_rating;
+              if (newRating !== undefined && newRating !== null) {
+                setCurrentRating(parseFloat(newRating));
+              }
 
-
+              Alert.alert("Thành công", "Đánh giá đã được xóa.");
+            } catch (e) {
+              Alert.alert("Lỗi", e.error || "Không thể xóa đánh giá.");
+              console.error("Delete Review Error:", e);
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+  
+  // Hàm renderMenuItem giữ nguyên
   const renderMenuItem = ({ item }) => (
     <TouchableOpacity 
         style={styles.menuCard} 
@@ -244,11 +304,26 @@ export default function RestaurantDetailScreen({ route, navigation }) {
     </TouchableOpacity>
   );
 
+  // ⭐️ [SỬA] RENDER RATING: Áp dụng logic làm tròn mới ⭐️
   const renderRating = () => {
-    let ratingValue = 4; 
-    if (item?.rating) {
-        ratingValue = Math.min(5, Math.max(0, Math.round(parseFloat(item.rating))));
-    } 
+    const finalRating = parseFloat(currentRating) || 0; 
+    
+    let ratingValue;
+    // ⭐️ LOGIC LÀM TRÒN TÙY CHỈNH ⭐️
+    if (finalRating >= 4.8) {
+        ratingValue = 5;
+    } else if (finalRating >= 4.0) {
+        ratingValue = 4;
+    } else if (finalRating >= 3.0) {
+        ratingValue = 3;
+    } else if (finalRating >= 2.0) {
+        ratingValue = 2;
+    } else if (finalRating >= 1.0) {
+        ratingValue = 1;
+    } else {
+        ratingValue = 0;
+    }
+     
     return (
       <Text style={styles.ratingText}>
         <Text style={{ color: COLORS.STAR }}>
@@ -257,9 +332,63 @@ export default function RestaurantDetailScreen({ route, navigation }) {
         <Text style={{ color: COLORS.SECONDARY_TEXT }}>
           {Array(5 - ratingValue).fill('★').join('')}
         </Text>
+        {/* HIỂN THỊ ĐIỂM SỐ CHÍNH XÁC */}
+        <Text style={{ color: COLORS.PRIMARY_TEXT, fontWeight: 'bold' }}> ({finalRating.toFixed(1)})</Text> 
       </Text>
     );
   };
+  
+  // ⭐️ [MỚI] COMPONENT RENDER TỪNG REVIEW ⭐️
+  const renderReviewItem = (review) => {
+      const isOwner = user?.uid === review.user_id; // Kiểm tra quyền sở hữu
+      
+      const avatarSource = review.avatarUrl 
+        ? { uri: review.avatarUrl } 
+        : null;
+
+      return (
+          <View key={review.id} style={styles.reviewItem}>
+              
+              <View style={styles.userHeader}>
+                  {/* AVATAR */}
+                  {avatarSource ? (
+                      <Image source={avatarSource} style={styles.avatarImage} />
+                  ) : (
+                      <View style={[
+                          styles.avatar, 
+                          { backgroundColor: review.avatarColor || '#CCCCCC' } // Sử dụng màu cố định
+                      ]}>
+                          <Text style={styles.avatarText}>{review.username[0]}</Text>
+                      </View>
+                  )}
+                  
+                  <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={styles.reviewUser}>
+                          {review.username} - {review.date}
+                      </Text>
+                      
+                      {/* NÚT XÓA (CHỈ HIỆN THỊ CHO CHÍNH CHỦ) */}
+                      {isOwner && (
+                          <TouchableOpacity onPress={() => handleDeleteReview(review.id)} style={styles.deleteButton}>
+                              <Ionicons name="trash-outline" size={20} color={COLORS.FAV_RED} />
+                          </TouchableOpacity>
+                      )}
+                  </View>
+              </View>
+              
+              <Text style={styles.reviewRatingStars}>
+                  <Text style={{ color: COLORS.STAR }}>
+                      {Array(review.rating).fill('★').join('')}
+                  </Text>
+                  <Text style={{ color: COLORS.SECONDARY_TEXT }}>
+                      {Array(5 - review.rating).fill('★').join('')}
+                  </Text>
+              </Text>
+              <Text style={styles.reviewComment}>{review.comment}</Text>
+          </View>
+      );
+  };
+
 
   const initialRegion = item?.lat && item?.lon
     ? {
@@ -269,6 +398,15 @@ export default function RestaurantDetailScreen({ route, navigation }) {
         longitudeDelta: 0.005,
       }
     : null;
+
+  if (loading) {
+      return (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={COLORS.ACCENT} />
+          <Text>Đang xử lý...</Text>
+        </View>
+      );
+  }
 
   return (
     // ⭐️ SỬ DỤNG SafeAreaView LÀM CONTAINER GỐC ⭐️
@@ -380,30 +518,7 @@ export default function RestaurantDetailScreen({ route, navigation }) {
                     {reviews.length === 0 ? (
                         <Text style={styles.noReviews}>Chưa có đánh giá nào. Hãy là người đầu tiên!</Text>
                     ) : (
-                        reviews.map((review) => (
-                            <View key={review.id} style={styles.reviewItem}>
-                                <View style={styles.userHeader}>
-                                    <View style={[
-                                        styles.avatar, 
-                                        { backgroundColor: review.avatarColor || '#CCCCCC' } 
-                                    ]}>
-                                        <Text style={styles.avatarText}>{review.username[0]}</Text>
-                                    </View>
-                                    <Text style={styles.reviewUser}>
-                                        {review.username} - {review.date}
-                                    </Text>
-                                </View>
-                                <Text style={styles.reviewRating}>
-                                    <Text style={{ color: COLORS.STAR }}>
-                                        {Array(review.rating).fill('★').join('')}
-                                    </Text>
-                                    <Text style={{ color: COLORS.SECONDARY_TEXT }}>
-                                        {Array(5 - review.rating).fill('★').join('')}
-                                    </Text>
-                                </Text>
-                                <Text style={styles.reviewComment}>{review.comment}</Text>
-                            </View>
-                        ))
+                        reviews.map(renderReviewItem) // ⭐️ SỬ DỤNG HÀM RENDER REVIEW MỚI ⭐️
                     )}
                 </View>
 
@@ -608,6 +723,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarImage: { // ⭐️ STYLE MỚI CHO AVATAR DÙNG URL ⭐️
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: COLORS.BORDER,
+  },
   avatarText: {
     color: COLORS.CARD_BACKGROUND, 
     fontWeight: 'bold',
@@ -615,15 +737,25 @@ const styles = StyleSheet.create({
   },
   reviewUser: {
     fontWeight: '700',
-    color: COLORS.ACCENT,
+    color: COLORS.PRIMARY_TEXT,
+    flexShrink: 1,
+  },
+  reviewRatingStars: { // Đổi tên style để tránh nhầm với renderRating
+    fontSize: 20,
+    marginBottom: 4,
+    marginLeft: 40, 
   },
   reviewComment: {
     color: COLORS.SECONDARY_TEXT,
-    marginLeft: 40,
+    marginLeft: 40, 
   },
   noReviews: {
     fontStyle: 'italic',
     color: COLORS.SECONDARY_TEXT,
     marginBottom: 10,
   },
+  deleteButton: {
+      padding: 5,
+      marginLeft: 10,
+  }
 });

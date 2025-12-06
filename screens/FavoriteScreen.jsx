@@ -25,24 +25,25 @@ const COLORS = {
 const PLACEHOLDER_IMAGE = require("../assets/amthuc.jpg"); 
 
 // KHỐI CODE GIẢ ĐỊNH ĐỂ TEST LỌC (Cần thiết cho quá trình dev/test)
-// Trong môi trường Production, Backend nên cung cấp endpoint API lấy chi tiết.
 const FULL_RESTAURANT_DETAILS_MOCK = [
-    // Đây là nơi bạn cần thêm các nhà hàng chi tiết tương ứng với IDs đang được lưu trong Firebase
-    // Tôi giữ một vài mục để tránh lỗi ReferenceError, nhưng bạn không cần phải dùng hết 100+ mục ở đây.
-    { id: "ChIJEzXHbEcvdTERYJU-jigOumI", name: "Haidilao Van Hanh Mall", image_url: "URL:", price_range: "100,000đ", rating: 5.0, address: "Tầng4 Vạn Hạnh Mall" },
-    { id: "ChIJqSUY9d8udTER3gWPfy0eMms", name: "Quán Ốc Như", image_url: "URL:", price_range: "80,000đ", rating: 4.2, address: "650/4/29D Điện Biên Phủ" },
-    { id: "ChIJxQUjKtsudTERO_KVgjmipAk", name: "Làng Nướng Nam Bộ", image_url: "URL:", price_range: "150,000đ", rating: 4.2, address: "302A Tô Hiến Thành" },
-    { id: "ChIJVcppq_MvdTER0YBMRQb1kMQ", name: "The Gangs Urban", image_url: "URL:", price_range: "110,000đ", rating: 4.3, address: "212 Lý Thái Tổ" },
-    { id: "ChIJEdqbuz0vdTERee2glMx18r0", name: "Mì Cay Xíu", image_url: "URL:", price_range: "65,000đ", rating: 3.0, address: "92/41/1, Tôn Thất Thuyết" },
+    // Giữ lại mock data
+    { id: "ChIJEzXHbEcvdTERYJU-jigOumI", name: "Haidilao Van Hanh Mall", image_url: "URL:", price_range: "100,000đ", rating: 5.0, address: "Tầng4 Vạn Hạnh Mall", current_rating: 4.8 }, 
+    { id: "ChIJqSUY9d8udTER3gWPfy0eMms", name: "Quán Ốc Như", image_url: "URL:", price_range: "80,000đ", rating: 4.2, address: "650/4/29D Điện Biên Phủ", current_rating: 4.2 },
+    { id: "ChIJxQUjKtsudTERO_KVgjmipAk", name: "Làng Nướng Nam Bộ", image_url: "URL:", price_range: "150,000đ", rating: 4.2, address: "302A Tô Hiến Thành", current_rating: 4.1 },
+    { id: "ChIJVcppq_MvdTER0YBMRQb1kMQ", name: "The Gangs Urban", image_url: "URL:", price_range: "110,000đ", rating: 4.3, address: "212 Lý Thái Tổ", current_rating: 4.35 }, 
+    { id: "ChIJEdqbuz0vdTERee2glMx18r0", name: "Mì Cay Xíu", image_url: "URL:", price_range: "65,000đ", rating: 3.0, address: "92/41/1, Tôn Thất Thuyết", current_rating: 3.7 },
 ];
+
+// ⭐️ [ĐÃ LOẠI BỎ] Component StarRating ⭐️
 
 
 const FavoriteItem = ({ item, navigation, onToggleLike }) => {
   const handlePress = () => {
+    // Truyền item, bao gồm cả điểm rating gốc và điểm current_rating (nếu backend cung cấp)
     navigation.navigate('RestaurantDetail', { item }); 
   };
   
-  // ⭐️ LOGIC FIX LỖI ẢNH ⭐️
+  // LOGIC FIX LỖI ẢNH 
   const imageSource = (item.image_url && item.image_url !== "URL:") 
     ? { uri: item.image_url } 
     : PLACEHOLDER_IMAGE; 
@@ -58,9 +59,12 @@ const FavoriteItem = ({ item, navigation, onToggleLike }) => {
       <View style={styles.itemInfo}>
         <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
         <View style={styles.row}>
-          <Ionicons name="star" size={14} color="#FFC300" />
-          <Text style={styles.itemRating}>{item.rating}</Text>
-          <Text style={styles.dot}>•</Text>
+          
+          {/* ⭐️ [ĐÃ LOẠI BỎ] Hiển thị Rating/Sao ⭐️
+          <Text style={styles.itemRating}>{displayRating.toFixed(1)}</Text>
+          <Text style={styles.dot}>•</Text> 
+          */}
+
           <Text style={styles.itemPrice}>{item.price_range}</Text> 
         </View>
         <Text style={styles.itemDistance}>{item.address}</Text> 
@@ -108,7 +112,6 @@ export default function FavoriteScreen({ navigation }) {
         
     } catch (e) {
         // Nếu API thất bại (ví dụ: lỗi 500 hoặc Network Error), ta sẽ fallback dùng Mock Data
-        // ⚠️ Dòng này có thể bị lỗi nếu bạn chưa tạo route /food/restaurants/details-by-ids
         console.error("Lỗi tải chi tiết Favorites từ API:", e);
         
         // ⭐️ FALLBACK KHI API THẤT BẠI ⭐️
@@ -341,11 +344,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
   },
+  // ⭐️ [ĐÃ SỬA] Loại bỏ marginleft vì không còn sao/điểm số bên trái
   itemRating: {
     fontSize: 13,
     fontWeight: "600",
     color: "#333",
-    marginLeft: 4,
+    // marginLeft: 4, <-- Đã loại bỏ
   },
   dot: {
     marginHorizontal: 6,
@@ -418,5 +422,5 @@ const styles = StyleSheet.create({
       color: COLORS.FAV_RED,
       marginTop: 20,
       fontSize: 16,
-  }
+  },
 });
