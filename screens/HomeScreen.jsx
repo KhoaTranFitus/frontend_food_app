@@ -13,6 +13,10 @@ import {
 } from "react-native";
 import BannerCarousel from "../components/BannerCarousel";
 import * as Location from "expo-location";
+// ⭐️ SỬA IMPORT ⭐️
+import { restaurantAPI } from "../services/flaskApi"; // ⬅️ THÊM IMPORT NÀY
+// XÓA: import { searchNearbyPlaces } from "../services/tomtomApi"; 
+// XÓA: import { normalizeResults, PROVINCES, searchByProvince, searchByQuery } from "../services/homeService"; 
 import { SafeAreaView } from "react-native-safe-area-context";
 import HomeHeader from "../components/HomeHeader";
 import FilterDropdown from "../components/FilterDropdown";
@@ -131,6 +135,22 @@ export default function HomeScreen({ navigation, route }) {
   const shownPlaces = places;
   const displayedNearby = Array.isArray(places) ? places.slice(0, MAX_NEARBY) : [];
 
+  // XÓA: handleFilterSelect cũ vì không còn dùng searchByProvince
+  // const handleFilterSelect = async (provinceId) => {
+  //   setDropdownVisible(false);
+  //   setLoading(true);
+  //   try {
+  //     const normalized = await searchByProvince(provinceId);
+  //     setPlaces(normalized);
+    //   } catch (err) {
+  //     console.warn('Filter search error', err);
+  //     setPlaces([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  // ⭐️ THAY THẾ LOGIC TẢI DỮ LIỆU BAN ĐẦU ⭐️
   // ⭐️ MODIFIED: Centralized location and search logic + Map animation ⭐️
   const handleFilterSelect = async (provinceId) => {
     // 1. Chuan hoa 'near_me' -> '' (dung GPS), cap nhat UI Dropdown
@@ -172,45 +192,23 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     (async () => {
       setLoading(true);
+      // Lấy vị trí người dùng (chỉ để truyền tham số, không còn dùng cho TomTom)
       const { status } = await Location.requestForegroundPermissionsAsync();
-      let initialUserLoc = null;
-
       if (status === "granted") {
-        try {
-          const loc = await Location.getCurrentPositionAsync({});
-          initialUserLoc = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-          setUserLoc(initialUserLoc);
-        } catch (e) {
-          console.warn("Failed to get current location:", e);
-        }
+        const loc = await Location.getCurrentPositionAsync({});
+        // Lưu vị trí người dùng
+        setUserLoc({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       }
-
-      // Mặc định ban đầu: '' nếu có GPS, hoặc 'hcm' nếu không có
-      const initialProvinceId = initialUserLoc ? '' : 'hcm';
-      const initialSearchLoc = await getSearchLocation(initialProvinceId, initialUserLoc);
-
-      // Set initial states
-      setSelectedProvinceId(initialProvinceId);
-      setSelectedProvinceName(PROVINCE_MAP[initialProvinceId] || "Gần tôi");
-      setSearchLocation(initialSearchLoc); // Map animattion
-
-      // Perform initial search using the determined location and default query
+      
+      // ⭐️ GỌI API THẬT ĐỂ LẤY DỮ LIỆU BAN ĐẦU ⭐️
       try {
-        const data = await searchRestaurants({
-          query: "",
-          provinceId: initialProvinceId,
-          provinceName: PROVINCE_MAP[initialProvinceId] || "Gần tôi",
-          userLoc: initialUserLoc,
-          radius: 2000,
-        });
-        setPlaces(data || []);
-        setSearchMode("nearby");
+          const data = await restaurantAPI.getAllRestaurants();
+          setPlaces(data || []);
       } catch (e) {
-        console.warn("Initial search error:", e);
-        setPlaces([]);
-      } finally {
-        setLoading(false);
+          console.error("Initial load error:", e);
+          setPlaces([]);
       }
+      setLoading(false);
     })();
   }, []);
 
@@ -224,36 +222,120 @@ export default function HomeScreen({ navigation, route }) {
   }, [route.params?.selectedCategory, searchLocation]);
 
 
-  // ⭐️ MODIFIED: Centralized doSearch using searchRestaurants ⭐️
-  const doSearch = async (text) => {
+  // ⭐️ THAY THẾ LOGIC TÌM KIẾM ⭐️
+  const doSearch = async (text, fromCategory = false) => {
     setQuery(text);
+    setLoading(true);
+
+    // Nếu search text rỗng → ưu tiên Nearby mode
     const nextMode = text?.trim() ? "full" : "nearby";
     setSearchMode(nextMode);
-    setLoading(true);
+
     try {
-      // Tìm kiếm dựa trên Tỉnh/Vị trí ĐANG CHỌN
-      const mapped = await searchRestaurants({
-        query: text,
-        provinceId: selectedProvinceId,
-        provinceName: selectedProvinceName,
-        userLoc: userLoc,
-        radius: nextMode === "nearby" ? 2000 : null,
-      });
+      let mapped = [];
+
+      // =============================
+      // 1. Nếu bấm danh mục → ƯU TIÊN LỌC CATEGORY
+      // =============================
+      if (fromCategory === true) {
+        mapped = await searchRestaurants({
+          query: null,
+          category: text,
+          provinceId: selectedProvinceId,
+          provinceName: selectedProvinceName,
+          userLoc: userLoc,
+          radius: nextMode === "nearby" ? 2000 : null,
+        });
+      }
+
+      // =============================
+      // 2. TÌM KIẾM THEO TỈNH (nếu đang chọn tỉnh)
+      // =============================
+      else if (selectedProvinceId || selectedProvinceName) {
+        mapped = await searchRestaurants({
+          query: text,
+          provinceId: selectedProvinceId,
+          provinceName: selectedProvinceName,
+          userLoc: null,
+          radius: null,
+        });
+      }
+
+      // =============================
+      // 3. TÌM KIẾM GẦN ĐÂY (nếu chế độ near me)
+      // =============================
+      else if (nextMode === "nearby" && userLoc) {
+        mapped = await searchRestaurants({
+          query: text,
+          userLoc: userLoc,
+          radius: 2000,
+        });
+      }
+
+      // =============================
+      // 4. FALLBACK → lấy tất cả (GGMap logic)
+      // =============================
+      else {
+        mapped = await restaurantAPI.getAllRestaurants(text);
+      }
+
+      // =============================
+      // UPDATE PLACE LIST
+      // =============================
       setPlaces(mapped);
-      // MapSection sẽ tự động update marker quán ăn
+
+      // =============================
+      // ANIMATE MAP
+      // =============================
+      if (mapRef.current && mapped?.length > 0) {
+        const first = mapped[0];
+        if (first.lat && first.lon) {
+          mapRef.current.animateToRegion(
+            {
+              latitude: first.lat,
+              longitude: first.lon,
+              latitudeDelta: 0.02,
+              longitudeDelta: 0.02,
+            },
+            450
+          );
+        }
+      }
     } catch (e) {
       console.warn("doSearch error:", e);
       setPlaces([]);
     } finally {
       setLoading(false);
     }
-  };
+  };  
+
   // xử lí cái danh mục
   const handleCategoryPress = (name) => {
     setSelectedCategory(name);
     doSearch(name);
   };
+  
+  // ⭐️ THÊM HÀM REFRESH MỚI ⭐️
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+        // Tải lại toàn bộ danh sách (không query, không lọc)
+        const data = await restaurantAPI.getAllRestaurants();
+        setPlaces(data);
+    } catch (e) {
+        console.error("Refresh error:", e);
+        setPlaces([]);
+    } finally {
+        setLoading(false);
+    }
+  }
 
+  // Tạm thời vô hiệu hóa lọc tỉnh thành vì đã xóa hàm handleFilterSelect
+  const handleFilterSelect = (provinceId) => {
+    setDropdownVisible(false);
+    console.warn(`Filtering by province ${provinceId} is temporarily disabled.`);
+  }
+  
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -289,21 +371,23 @@ export default function HomeScreen({ navigation, route }) {
           <ScrollView showsVerticalScrollIndicator={false} onScroll={handleScroll} scrollEventThrottle={16} refreshControl={
             <RefreshControl
               refreshing={loading}
-              onRefresh={async () => {
-                setLoading(true);
-                const mode = query?.trim() ? "full" : "nearby";
-                setSearchMode(mode);
-                // Use current selected province ID and userLoc for refresh
-                const data = await searchRestaurants({
-                  query: query || "",
-                  provinceId: selectedProvinceId,
-                  provinceName: selectedProvinceName,
-                  userLoc: userLoc,
-                  radius: mode === "nearby" ? 2000 : null,
-                });
-                setPlaces(data);
-                setLoading(false);
-              }}
+              onRefresh={handleRefresh} // ⭐️ SỬ DỤNG HÀM REFRESH MỚI ⭐️
+//               onRefresh={async () => {
+//                 setLoading(true);
+//                 const mode = query?.trim() ? "full" : "nearby";
+//                 setSearchMode(mode);
+//                 // Use current selected province ID and userLoc for refresh
+//                 const data = await searchRestaurants({
+//                   query: query || "",
+//                   provinceId: selectedProvinceId,
+//                   provinceName: selectedProvinceName,
+//                   userLoc: userLoc,
+//                   radius: mode === "nearby" ? 2000 : null,
+//                 });
+//                 setPlaces(data);
+//                 setLoading(false);
+//               }}
+
               colors={["#ff6347"]}
             />
           }>
@@ -358,8 +442,11 @@ const styles = StyleSheet.create({
     width: 60,        // nhỏ lại (từ 80–100 → 60)
     height: 60,
     alignItems: "center",
-    marginRight: 8,   // giảm khoảng cách giữa các item
-  }
-}
-);
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: "700" },
+  seeAll: { fontSize: 14, color: "#ff6347" },
+});
 
