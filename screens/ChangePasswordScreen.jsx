@@ -51,59 +51,59 @@ export default function ChangePasswordScreen() {
     }
   };
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <Text style={styles.title}>Đặt lại mật khẩu</Text>
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>Đặt lại mật khẩu</Text>
 
-            <TextInput
-                style={styles.input}
-                placeholder="Mật khẩu mới"
-                placeholderTextColor="#999"
-                secureTextEntry
-                value={newPassword}
-                onChangeText={setNewPassword}
-            />
+      <TextInput
+        style={styles.input}
+        placeholder="Mật khẩu mới"
+        placeholderTextColor="#999"
+        secureTextEntry
+        value={newPassword}
+        onChangeText={setNewPassword}
+      />
 
-            <TextInput
-                style={styles.input}
-                placeholder="Xác nhận mật khẩu"
-                placeholderTextColor="#999"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-            />
+      <TextInput
+        style={styles.input}
+        placeholder="Xác nhận mật khẩu"
+        placeholderTextColor="#999"
+        secureTextEntry
+        value={confirmPassword}
+        onChangeText={setConfirmPassword}
+      />
 
-            <TouchableOpacity
-                style={[styles.btn, loading && { opacity: 0.6 }]}
-                onPress={handleChange}
-                disabled={loading}
-            >
-                {loading ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.btnText}>LƯU MẬT KHẨU</Text>
-                )}
-            </TouchableOpacity>
-        </SafeAreaView>
-    );
+      <TouchableOpacity
+        style={[styles.btn, loading && { opacity: 0.6 }]}
+        onPress={handleChange}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.btnText}>LƯU MẬT KHẨU</Text>
+        )}
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: "center", padding: 25 },
-    title: { fontSize: 26, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
-    email: { textAlign: "center", marginBottom: 20, color: "#555" },
-    input: {
-        borderWidth: 1,
-        borderColor: "#ddd",
-        padding: 12,
-        borderRadius: 10,
-        marginBottom: 15,
-    },
-    btn: {
-        backgroundColor: "#F9A825",
-        padding: 14,
-        borderRadius: 10,
-        alignItems: "center",
-    },
-    btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  container: { flex: 1, justifyContent: "center", padding: 25 },
+  title: { fontSize: 26, fontWeight: "bold", marginBottom: 15, textAlign: "center" },
+  email: { textAlign: "center", marginBottom: 20, color: "#555" },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  btn: {
+    backgroundColor: "#F9A825",
+    padding: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  btnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });

@@ -35,7 +35,7 @@ export default function LoginScreen() {
     try {
       const result = await authAPI.login(email, password);
       console.log('Login success:', result);
-      
+
       // Gọi login từ AuthContext để update state
       // Token đã được lưu bởi interceptor
       if (login) {
@@ -44,7 +44,19 @@ export default function LoginScreen() {
       // Navigation sẽ tự động xảy ra từ AppNavigator khi isLoggedIn = true
     } catch (error) {
       console.error('Login error:', error);
-      alert(error.error || error.message || 'Đăng nhập thất bại');
+      
+      // Kiểm tra nếu lỗi là email chưa được xác thực
+      const errorMessage = error.error || error.message || '';
+      if (errorMessage.includes('chưa được xác thực') || errorMessage.includes('not verified')) {
+        alert('Email chưa được xác thực. Bạn sẽ được chuyển đến màn hình xác thực.');
+        // Chuyển đến màn hình verify với email đã nhập
+        navigation.navigate('Verify', {
+          mode: 'verify_email',
+          email: email,
+        });
+      } else {
+        alert(errorMessage || 'Đăng nhập thất bại');
+      }
     } finally {
       setLoading(false);
     }
@@ -111,8 +123,8 @@ export default function LoginScreen() {
             <Text style={styles.forgot}>Forgot password?</Text>
           </TouchableOpacity>
           {/* LOGIN BUTTON */}
-          <TouchableOpacity 
-            style={[styles.loginBtn, loading && { opacity: 0.6 }]} 
+          <TouchableOpacity
+            style={[styles.loginBtn, loading && { opacity: 0.6 }]}
             onPress={handleLogin}
             disabled={loading}
           >

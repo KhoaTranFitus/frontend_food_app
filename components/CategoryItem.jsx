@@ -3,63 +3,74 @@ import { Pressable, View, Image, Text, StyleSheet } from "react-native";
 
 export default function CategoryItem({ cat, index, onPress, isSelected }) {
   const handlePress = () => {
-    if (onPress) {
-      onPress(cat.name);
-    }
+    if (onPress) onPress(cat.name);
   };
 
   return (
     <Pressable
       onPress={handlePress}
       style={styles.container}
-      android_ripple={{ color: "#eee" }}
-      accessibilityLabel={`Category ${cat.name}`}
+      android_ripple={{ color: "#e9e9e9" }}
     >
-      <View style={[styles.iconWrap, isSelected && styles.iconWrapPressed]}>
+      <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
         <Image source={cat.icon} style={styles.icon} />
       </View>
-      <Text style={[styles.label, isSelected && styles.labelPressed]}>{cat.name}</Text>
+
+      <Text style={[styles.label, isSelected && styles.labelSelected]}>
+        {cat.name}
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    width: 100,
-    alignItems: "center",
-    marginRight: 12,
-  },
-  iconWrap: {
     width: 80,
-    height: 80,
-    borderRadius: 20,
+    alignItems: "center",
+    marginRight: 10,
+  },
+
+  iconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 16,
     backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    elevation: 3,
-    marginBottom: 6,
+
+    // shadow
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.10,
+    shadowOffset: { width: 0, height: 1 },
     shadowRadius: 3,
+    elevation: 2,
+
+    marginBottom: 5,
   },
-  iconWrapPressed: {
-    backgroundColor: "#ff6347",
+
+  iconWrapSelected: {
+    backgroundColor: "#f7c065",
+    elevation: 4,
+    shadowOpacity: 0.22,
   },
+
   icon: {
-    width: 60,
-    height: 60,
+    width: 56,   // gần sát viền
+    height: 56,
     resizeMode: "cover",
-    borderRadius: 15,
+    borderRadius: 14,  // bo theo khuôn
   },
+
   label: {
-    fontSize: 13,
-    textAlign: "center",
+    fontSize: 12,
     fontWeight: "500",
-    color: "#333",
+    color: "#444",
+    marginTop: 2,
+    textAlign: "center",
   },
-  labelPressed: {
-    color: "#ff6347",
+
+  labelSelected: {
+    color: "#e08b1f",
     fontWeight: "700",
   },
 });

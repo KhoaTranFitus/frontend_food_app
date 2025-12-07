@@ -1,3 +1,5 @@
+//flaskApi.jsx
+
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -30,6 +32,13 @@ apiClient.interceptors.request.use(
     } catch (error) {
       console.warn('Error getting token:', error);
     }
+
+    // Log outbound request payload without leaking auth header
+    const { method, url, params, data } = config;
+    console.log('API request ->', method?.toUpperCase(), url, {
+      params,
+      data,
+    });
     return config;
   },
   (error) => Promise.reject(error)
@@ -48,8 +57,9 @@ apiClient.interceptors.response.use(
     // Xử lý các loại lỗi khác nhau
     if (!error.response) {
       // Network error - in ra chi tiết
-      console.error('❌ Network error:', error.message);
-      console.error('🔗 API URL:', BASE_URL);
+      console.error('Network error:', error.message);
+      console.error('Error details:', error);
+      console.error('API URL:', BASE_URL);
       error.message = 'Lỗi kết nối. Kiểm tra:\n1. Backend có đang chạy không?\n2. IP đúng không? (' + BASE_URL + ')\n3. Device có cùng WiFi không?';
     } else if (error.response.status === 500) {
       error.message = 'Lỗi server: ' + (error.response.data?.error || 'Unknown error');
@@ -79,13 +89,13 @@ export const authAPI = {
         password,
         name,
       });
-      
+
       // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.token || response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Register error:', error);
@@ -119,6 +129,7 @@ export const authAPI = {
             throw error.response?.data || { error: error.message };
         }
     },
+
 
   logout: async () => {
     try {
@@ -258,9 +269,11 @@ export const userAPI = {
 
 // ============ RESTAURANT ENDPOINTS ============
 export const restaurantAPI = {
+  // ⭐️ MODIFIED: Changed endpoint từ '/restaurants' sang '/restaurants/search' ⭐️
+  // Đây là endpoint được sử dụng cho tìm kiếm có lọc (query, lat, lon)
   getAll: async (filters = {}) => {
     try {
-      const response = await apiClient.get('/restaurants', { params: filters });
+      const response = await apiClient.post('/search', filters);
       return response.data;
     } catch (error) {
       console.error('Get restaurants error:', error);
@@ -278,17 +291,7 @@ export const restaurantAPI = {
     }
   },
 
-  search: async (query) => {
-    try {
-      const response = await apiClient.get('/restaurants/search', {
-        params: { q: query },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Search restaurants error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+  // Đã loại bỏ phương thức 'search' cũ để tránh nhầm lẫn, 'getAll' giờ là phương thức tìm kiếm chính.
 
   getNearby: async (latitude, longitude, radius = 5000) => {
     try {
@@ -320,7 +323,7 @@ export const foodAPI = {
       const response = await apiClient.get('/foods', { params: filters });
       return response.data;
     } catch (error) {
-      console.error('Get foods error:', error);
+      console.error('Get foods error:`', error);
       throw error.response?.data || { error: error.message };
     }
   },
@@ -489,25 +492,43 @@ export const categoryAPI = {
 
 // ============ CHATBOT ENDPOINTS ============
 export const chatbotAPI = {
-  // Gửi tin nhắn và nhận phản hồi từ chatbot
-  sendMessage: async (message) => {
+  // Gửi tin nhắn và nhận phản hồi từ chatbot OpenAI
+  sendMessage: async (message, conversationId = null) => {
     try {
-      const response = await apiClient.post('/chatbot', {
-        message,
+      const response = await apiClient.post('/chat', {
+        message: message,
+        conversation_id: conversationId, // Giữ conversation để có context
       });
+      
+      // Backend trả về: { conversation_id, user_message, bot_response, timestamp }
       return response.data;
     } catch (error) {
       console.error('Send chatbot message error:', error);
+      
+      // Xử lý lỗi cụ thể
+      if (error.response?.status === 500 && error.response?.data?.error?.includes('API key')) {
+        throw { error: '⚠️ Backend chatbot chưa cấu hình OpenAI API key. Vui lòng kiểm tra file .env' };
+      }
+      
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // Kiểm tra trạng thái chatbot
+  checkStatus: async () => {
+    try {
+      const response = await apiClient.get('/chat/status');
+      return response.data;
+    } catch (error) {
+      console.error('Check chatbot status error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
   // Lấy lịch sử chat của user
-  getChatHistory: async (limit = 50) => {
+  getChatHistory: async (conversationId) => {
     try {
-      const response = await apiClient.get('/chatbot/history', {
-        params: { limit },
-      });
+      const response = await apiClient.get(`/chat/history/${conversationId}`);
       return response.data;
     } catch (error) {
       console.error('Get chat history error:', error);
