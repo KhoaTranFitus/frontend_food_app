@@ -187,9 +187,19 @@ export default function RestaurantDetailScreen({ route, navigation }) {
       navigation.goBack();
   };
 
-  // HÀM CHỈ ĐƯỜNG: CHUYỂN HƯỚNG TRỰC TIẾP 
+
+  // ⭐️ HÀM CHỈ ĐƯỜNG: TRUYỀN TỌA ĐỘ NHÀ HÀNG SANG MAPSCREEN ⭐️
   const handleNavigate = () => {
-    navigation.navigate('Map');
+    if (!item?.position) {
+      Alert.alert('Lỗi', 'Không có tọa độ nhà hàng');
+      return;
+    }
+    navigation.navigate('Map', {
+      destination: {
+        latitude: item.position.lat,
+        longitude: item.position.lon,
+      },
+    });
   };
   
   // ⭐️ LOGIC GỬI REVIEW ĐÃ ĐƯỢC CẬP NHẬT GỌI API THỰC TẾ ⭐️

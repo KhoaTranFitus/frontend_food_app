@@ -1,3 +1,5 @@
+//flaskApi.jsx
+
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi 401
@@ -5,6 +7,7 @@ import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
 const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.22:5000/api'; 
+
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
 const BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
@@ -31,6 +34,13 @@ apiClient.interceptors.request.use(
     } catch (error) {
       console.warn('Error getting token:', error);
     }
+
+    // Log outbound request payload without leaking auth header
+    const { method, url, params, data } = config;
+    console.log('API request ->', method?.toUpperCase(), url, {
+      params,
+      data,
+    });
     return config;
   },
   (error) => Promise.reject(error)
@@ -48,7 +58,10 @@ apiClient.interceptors.response.use(
     }
 
     if (!error.response) {
-      console.error('❌ Network error:', error.message);
+      // Network error - in ra chi tiết
+      console.error('Network error:', error.message);
+      console.error('Error details:', error);
+      console.error('API URL:', BASE_URL);
       error.message = 'Lỗi kết nối. Kiểm tra:\n1. Backend có đang chạy không?\n2. IP đúng không? (' + BASE_URL + ')\n3. Device có cùng WiFi không?';
     } else if (status === 500) {
       error.message = 'Lỗi server: ' + (error.response.data?.error || 'Unknown error');
@@ -60,6 +73,14 @@ apiClient.interceptors.response.use(
   }
 );
 
+const getUserId = async () => {
+    try {
+        const jsonValue = await AsyncStorage.getItem('user_data');
+        const user = jsonValue != null ? JSON.parse(jsonValue) : null;
+        return user?.uid || null;
+    } catch (e) { return null; }
+};
+
 // ============ AUTHENTICATION ENDPOINTS ============
 export const authAPI = {
   register: async (email, password, name) => {
@@ -67,10 +88,13 @@ export const authAPI = {
       const response = await apiClient.post('/user/register', {
         email, password, name,
       });
+
+      // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.token || response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
+
       return response.data;
     } catch (error) {
       console.error('Register error:', error);
@@ -85,17 +109,26 @@ export const authAPI = {
         password,
       });
       
-      const token = response.data?.token || response.data?.idToken;
-      if (token) {
-        await AsyncStorage.setItem('authToken', token);
-      }
-      
-      return response.data;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
+      // Lưu token - backend có thể trả token, idToken, hoặc không trả
+            const token = response.data?.idToken || response.data?.token;
+            if (token) {
+                await AsyncStorage.setItem('authToken', token);
+            }
+
+            // 2. LƯU THÔNG TIN USER (QUAN TRỌNG ĐỂ PROFILE HIỂN THỊ)
+            if (response.data?.user) {
+                console.log("Đang lưu user data:", response.data.user); // Log để kiểm tra
+                await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
+            }
+            // ----------------------------------
+
+            return response.data;
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error.response?.data || { error: error.message };
+        }
+    },
+
 
   getProfile: async () => {
     try {
@@ -226,6 +259,8 @@ export const userAPI = {
 
 // ============ RESTAURANT ENDPOINTS ============
 export const restaurantAPI = {
+  // ⭐️ MODIFIED: Changed endpoint từ '/restaurants' sang '/restaurants/search' ⭐️
+  // Đây là endpoint được sử dụng cho tìm kiếm có lọc (query, lat, lon)
   getAll: async (filters = {}) => {
     try {
       const response = await apiClient.get('/food/restaurants', { params: filters });
@@ -311,7 +346,7 @@ export const foodAPI = {
       const response = await apiClient.get('/food/foods', { params: filters });
       return response.data;
     } catch (error) {
-      console.error('Get foods error:', error);
+      console.error('Get foods error:`', error);
       throw error.response?.data || { error: error.message };
     }
   },
@@ -505,23 +540,43 @@ export const categoryAPI = {
 
 // ============ CHATBOT ENDPOINTS ============
 export const chatbotAPI = {
-  sendMessage: async (message) => {
+  // Gửi tin nhắn và nhận phản hồi từ chatbot OpenAI
+  sendMessage: async (message, conversationId = null) => {
     try {
-      const response = await apiClient.post('/chatbot', {
-        message,
+      const response = await apiClient.post('/chat', {
+        message: message,
+        conversation_id: conversationId, // Giữ conversation để có context
       });
+      
+      // Backend trả về: { conversation_id, user_message, bot_response, timestamp }
       return response.data;
     } catch (error) {
       console.error('Send chatbot message error:', error);
+      
+      // Xử lý lỗi cụ thể
+      if (error.response?.status === 500 && error.response?.data?.error?.includes('API key')) {
+        throw { error: '⚠️ Backend chatbot chưa cấu hình OpenAI API key. Vui lòng kiểm tra file .env' };
+      }
+      
       throw error.response?.data || { error: error.message };
     }
   },
 
-  getChatHistory: async (limit = 50) => {
+  // Kiểm tra trạng thái chatbot
+  checkStatus: async () => {
     try {
-      const response = await apiClient.get('/chatbot/history', {
-        params: { limit },
-      });
+      const response = await apiClient.get('/chat/status');
+      return response.data;
+    } catch (error) {
+      console.error('Check chatbot status error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // Lấy lịch sử chat của user
+  getChatHistory: async (conversationId) => {
+    try {
+      const response = await apiClient.get(`/chat/history/${conversationId}`);
       return response.data;
     } catch (error) {
       console.error('Get chat history error:', error);
