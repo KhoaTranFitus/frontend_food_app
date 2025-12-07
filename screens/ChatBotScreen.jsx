@@ -11,6 +11,7 @@ export default function ChatBotScreen() {
   const [input, setInput] = useState('');
   const [conversationId, setConversationId] = useState(null); // Lưu conversation ID
   const [isLoading, setIsLoading] = useState(false);
+  const [abortController, setAbortController] = useState(null); // Controller để cancel request
 
   const quickSuggestions = [
     { id: 1, emoji: '🍜', text: 'Gợi ý quán phở', query: 'Quán phở tốt nhất' },
@@ -18,6 +19,26 @@ export default function ChatBotScreen() {
     { id: 3, emoji: '🍣', text: 'Nhà hàng sushi', query: 'Quán sushi đắt nhất' },
     { id: 4, emoji: '🍚', text: 'Quán cơm gần Hcmus', query: 'Quán cơm ngon nhất' },
   ];
+
+  // Dừng tìm kiếm
+  const handleStopSearch = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+    setIsLoading(false);
+    
+    // Xóa loading message
+    setMessages(prev => {
+      const withoutLoading = prev.filter(msg => !msg.isLoading);
+      const cancelMessage = {
+        id: Date.now(),
+        text: 'Đã dừng tìm kiếm',
+        isBot: true,
+      };
+      return [...withoutLoading, cancelMessage];
+    });
+  };
 
   // Gửi tin nhắn
   const handleSendMessage = async (query = input) => {
@@ -33,6 +54,19 @@ export default function ChatBotScreen() {
     setInput('');
     setIsLoading(true);
 
+    // Thêm loading message
+    const loadingMessage = {
+      id: Date.now(),
+      text: '🔍 Chat Food đang tìm kiếm cho bạn...',
+      isBot: true,
+      isLoading: true,
+    };
+    setMessages(prev => [...prev, loadingMessage]);
+
+    // Tạo AbortController mới
+    const controller = new AbortController();
+    setAbortController(controller);
+
     try {
       // Gọi API với conversation_id để giữ context
       const response = await chatbotAPI.sendMessage(query, conversationId);
@@ -42,26 +76,35 @@ export default function ChatBotScreen() {
         setConversationId(response.conversation_id);
       }
       
-      // Thêm tin nhắn bot vào history
-      const botMessage = {
-        id: messages.length + 2,
-        text: response.bot_response,
-        isBot: true,
-        timestamp: response.timestamp,
-      };
-      setMessages(prev => [...prev, botMessage]);
+      // Xóa loading message và thêm response thực tế
+      setMessages(prev => {
+        const withoutLoading = prev.filter(msg => !msg.isLoading);
+        const botMessage = {
+          id: Date.now(),
+          text: response.bot_response,
+          isBot: true,
+          timestamp: response.timestamp,
+        };
+        return [...withoutLoading, botMessage];
+      });
     } catch (error) {
       console.error('Chatbot error:', error);
       
-      // Hiển thị lỗi cho user
-      const errorMessage = {
-        id: messages.length + 2,
-        text: `❌ Lỗi: ${error.error || error.message || 'Không thể kết nối với chatbot'}`,
-        isBot: true,
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      // Xóa loading message và hiển thị lỗi (trừ khi bị abort)
+      if (error.name !== 'AbortError' && error.name !== 'CanceledError') {
+        setMessages(prev => {
+          const withoutLoading = prev.filter(msg => !msg.isLoading);
+          const errorMessage = {
+            id: Date.now(),
+            text: `❌ Lỗi: ${error.error || error.message || 'Không thể kết nối với chatbot'}`,
+            isBot: true,
+          };
+          return [...withoutLoading, errorMessage];
+        });
+      }
     } finally {
       setIsLoading(false);
+      setAbortController(null);
     }
   };
 
@@ -90,11 +133,27 @@ export default function ChatBotScreen() {
     </TouchableOpacity>
   );
 
+  // Xóa lịch sử chat
+  const handleClearHistory = () => {
+    setMessages([
+      { id: 1, text: 'Chào bro! 👨‍🍳 Tôi là Food App AI, sẵn sàng giúp bro tìm nhà hàng tuyệt vời hoặc gợi ý các món ăn ngon!', isBot: true },
+    ]);
+    setConversationId(null);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🤖🧠🇦🇮👾 Food App AI</Text>
-        <Text style={styles.headerSubtitle}>Trợ lý ẩm thực của bạn</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>🤖🧠🇦🇮👾 Food App AI</Text>
+          <Text style={styles.headerSubtitle}>Trợ lý ẩm thực của bạn</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.clearButton}
+          onPress={handleClearHistory}
+        >
+          <Ionicons name="trash-outline" size={22} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -132,14 +191,18 @@ export default function ChatBotScreen() {
             onChangeText={setInput}
             multiline
             maxHeight={100}
+            editable={!isLoading}
           />
           <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]}
-            onPress={() => handleSendMessage()}
-            disabled={!input.trim() || isLoading}
+            style={[
+              styles.sendButton,
+              isLoading ? styles.stopButtonStyle : (!input.trim() && styles.sendButtonDisabled)
+            ]}
+            onPress={isLoading ? handleStopSearch : () => handleSendMessage()}
+            disabled={!isLoading && !input.trim()}
           >
             {isLoading ? (
-              <Text style={{ color: '#fff', fontSize: 12 }}>...</Text>
+              <Ionicons name="stop-circle" size={20} color="#fff" />
             ) : (
               <Ionicons name="send" size={20} color="#fff" />
             )}
@@ -161,6 +224,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
@@ -171,6 +240,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#ffcccc',
     marginTop: 4,
+  },
+  clearButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   messagesList: {
     paddingHorizontal: 12,
@@ -296,5 +373,8 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#ccc',
+  },
+  stopButtonStyle: {
+    backgroundColor: '#dc3545',
   },
 });
