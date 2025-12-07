@@ -69,10 +69,18 @@ export default function RestaurantDetailScreen({ route, navigation }) {
       navigation.goBack();
   };
 
-  // ⭐️ HÀM CHỈ ĐƯỜNG: CHUYỂN HƯỚNG TRỰC TIẾP ⭐️
+  // ⭐️ HÀM CHỈ ĐƯỜNG: TRUYỀN TỌA ĐỘ NHÀ HÀNG SANG MAPSCREEN ⭐️
   const handleNavigate = () => {
-    // Không cần logic tính toán nữa, chỉ cần chuyển hướng
-    navigation.navigate('Map');
+    if (!item?.position) {
+      Alert.alert('Lỗi', 'Không có tọa độ nhà hàng');
+      return;
+    }
+    navigation.navigate('Map', {
+      destination: {
+        latitude: item.position.lat,
+        longitude: item.position.lon,
+      },
+    });
   };
   
   const handleSubmitReview = async () => {
