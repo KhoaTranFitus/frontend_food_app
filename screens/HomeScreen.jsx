@@ -329,12 +329,6 @@ export default function HomeScreen({ navigation, route }) {
         setLoading(false);
     }
   }
-
-  // Tạm thời vô hiệu hóa lọc tỉnh thành vì đã xóa hàm handleFilterSelect
-  const handleFilterSelect = (provinceId) => {
-    setDropdownVisible(false);
-    console.warn(`Filtering by province ${provinceId} is temporarily disabled.`);
-  }
   
   if (loading) {
     return (
