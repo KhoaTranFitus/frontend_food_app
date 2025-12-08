@@ -6,7 +6,7 @@ import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.22:5000/api'; 
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://172.20.10.5:5000/api'; 
 
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
@@ -17,7 +17,7 @@ console.log('API Base URL:', BASE_URL);
 // Tạo instance axios
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 120000, // 120s cho ngrok tunnel (map/routing cần nhiều thời gian)
   headers: {
     'Content-Type': 'application/json',
   },
@@ -85,16 +85,18 @@ const getUserId = async () => {
 export const authAPI = {
   register: async (email, password, name) => {
     try {
-      const response = await apiClient.post('/user/register', {
-        email, password, name,
+      const response = await apiClient.post('/register', {
+        email,
+        password,
+        name,
       });
-
+      
       // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.token || response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
-
+      
       return response.data;
     } catch (error) {
       console.error('Register error:', error);
@@ -104,79 +106,39 @@ export const authAPI = {
 
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('/user/login', {
+      const response = await apiClient.post('/login', {
         email,
         password,
       });
       
       // Lưu token - backend có thể trả token, idToken, hoặc không trả
-            const token = response.data?.idToken || response.data?.token;
-            if (token) {
-                await AsyncStorage.setItem('authToken', token);
-            }
+      const token = response.data?.idToken || response.data?.token;
+      if (token) {
+        await AsyncStorage.setItem('authToken', token);
+      }
 
-            // 2. LƯU THÔNG TIN USER (QUAN TRỌNG ĐỂ PROFILE HIỂN THỊ)
-            if (response.data?.user) {
-                console.log("Đang lưu user data:", response.data.user); // Log để kiểm tra
-                await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
-            }
-            // ----------------------------------
+      // LƯU THÔNG TIN USER (QUAN TRỌNG ĐỂ PROFILE HIỂN THỊ)
+      if (response.data?.user) {
+        console.log("Đang lưu user data:", response.data.user);
+        await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
+      }
 
-            return response.data;
-        } catch (error) {
-            console.error('Login error:', error);
-            throw error.response?.data || { error: error.message };
-        }
-    },
-
-
-  getProfile: async () => {
-    try {
-      const response = await apiClient.get('/user/profile'); 
-      return response.data.user; // Trả về đối tượng user
+      return response.data;
     } catch (error) {
-      console.error('Get profile error:', error);
+      console.error('Login error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
   logout: async () => {
-    try {
-      await apiClient.post('/user/auth/logout');
-    } finally {
-      await AsyncStorage.removeItem('authToken');
-    }
-  },
-
-  changePassword: async (oldPassword, newPassword) => {
-    try {
-      const response = await apiClient.put('/user/auth/change-password', {
-        oldPassword,
-        newPassword,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Change password error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  resetPassword: async (email, newPassword) => {
-    try {
-      const response = await apiClient.post('/user/auth/reset-password', {
-        email,
-        newPassword,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Reset password error:', error);
-      throw error.response?.data || { error: error.message };
-    }
+    // Backend không có /auth/logout endpoint - chỉ xóa local storage
+    await AsyncStorage.removeItem('authToken');
+    await AsyncStorage.removeItem('user_data');
   },
 
   verifyEmail: async (email, code) => {
     try {
-      const response = await apiClient.post('/user/verify', {
+      const response = await apiClient.post('/verify', {
         email,
         code,
       });
@@ -187,71 +149,109 @@ export const authAPI = {
     }
   },
 
-  refreshToken: async () => {
+  googleLogin: async (idToken) => {
     try {
-      const response = await apiClient.post('/user/auth/refresh');
-      if (response.data?.token) {
-        await AsyncStorage.setItem('authToken', response.data.token);
+      const response = await apiClient.post('/google-login', {
+        idToken,
+      });
+      
+      const token = response.data?.user?.uid;
+      if (token) {
+        await AsyncStorage.setItem('authToken', token);
       }
+      
+      if (response.data?.user) {
+        await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
+      }
+      
       return response.data;
     } catch (error) {
-      console.error('Refresh token error:', error);
-      throw error;
+      console.error('Google login error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  forgotPassword: async (email) => {
+    try {
+      const response = await apiClient.post('/forgot-password', {
+        email,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      throw error.response?.data || { error: error.message };
     }
   },
 };
 
 // ============ USER PROFILE ENDPOINTS ============
 export const userAPI = {
-  getProfile: async () => {
+  // 1. Lấy thông tin User
+  getProfile: async (userId) => {
+    // Backend mình dùng route /favorite/view để lấy info user kèm danh sách yêu thích
+    // Hoặc nếu bạn đã login, ta có thể lấy từ AsyncStorage.
+    // Để chắc ăn, ta dùng dữ liệu lưu trong AsyncStorage khi Login thành công.
     try {
-      const response = await apiClient.get('/user/profile');
-      return response.data;
+      const jsonValue = await AsyncStorage.getItem('user_data');
+      return jsonValue != null ? JSON.parse(jsonValue) : null;
     } catch (error) {
-      console.error('Get profile error:', error);
-      throw error.response?.data || { error: error.message };
+      throw error;
     }
-  },
-  
-  updateProfile: async (userData) => {
-    try {
-      const response = await apiClient.put('/user/profile', userData);
-      return response.data;
-    } catch (error) {
-      console.error('Update profile error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-    
   },
 
-  uploadAvatar: async (imageUri) => {
+  // 2. Cập nhật Tên và Avatar
+  updateProfile: async (name, avatar_url) => {
+    const uid = await getUserId();
+    if (!uid) throw new Error("Không tìm thấy User ID");
+
     try {
-      const formData = new FormData();
-      formData.append('avatar', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: `avatar_${Date.now()}.jpg`,
+      const response = await apiClient.post('/user/update-profile', {
+        uid,
+        name,
+        avatar_url // Gửi chuỗi base64 hoặc link ảnh
       });
 
-      const response = await apiClient.post('/user/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Cập nhật lại AsyncStorage để app hiển thị đúng ngay lập tức
+      const currentUser = await userAPI.getProfile();
+      const newUser = { ...currentUser, ...response.data.user };
+      await AsyncStorage.setItem('user_data', JSON.stringify(newUser));
+
       return response.data;
     } catch (error) {
-      console.error('Upload avatar error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
-  deleteAccount: async () => {
+  // 3. Đổi mật khẩu (Cần mật khẩu cũ)
+  changePassword: async (oldPassword, newPassword) => {
+    const uid = await getUserId();
+    if (!uid) throw new Error("Không tìm thấy User ID");
+
     try {
-      const response = await apiClient.delete('/user/account');
-      await AsyncStorage.removeItem('authToken');
+      const response = await apiClient.post('/user/update-password', {
+        uid,
+        old_password: oldPassword,
+        new_password: newPassword
+      });
       return response.data;
     } catch (error) {
-      console.error('Delete account error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // 4. Đổi Email (Cần mật khẩu xác nhận)
+  changeEmail: async (password, newEmail) => {
+    const uid = await getUserId();
+    if (!uid) throw new Error("Không tìm thấy User ID");
+
+    try {
+      const response = await apiClient.post('/user/update-email', {
+        uid,
+        password: password,
+        new_email: newEmail
+      });
+      return response.data;
+    } catch (error) {
       throw error.response?.data || { error: error.message };
     }
   },
@@ -259,101 +259,135 @@ export const userAPI = {
 
 // ============ RESTAURANT ENDPOINTS ============
 export const restaurantAPI = {
-  // ⭐️ MODIFIED: Changed endpoint từ '/restaurants' sang '/restaurants/search' ⭐️
-  // Đây là endpoint được sử dụng cho tìm kiếm có lọc (query, lat, lon)
-  getAll: async (filters = {}) => {
+  // GET /api/restaurants - Lấy tất cả nhà hàng
+  getAll: async () => {
     try {
-      const response = await apiClient.get('/food/restaurants', { params: filters });
-      return response.data;
+      const response = await apiClient.get('/restaurants');
+      return response.data.restaurants || [];
     } catch (error) {
-      console.error('Get restaurants error:', error);
+      console.error('Get all restaurants error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
-  getById: async (id) => {
+  // GET /api/restaurants/search?q=<query> - Tìm kiếm đơn giản
+  searchSimple: async (query) => {
     try {
-      const response = await apiClient.get(`/food/restaurants/${id}`);
-      return response.data;
-    } catch (error) {
-      console.error('Get restaurant error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  search: async (query) => {
-    try {
-      const response = await apiClient.get('/food/restaurants/search', {
+      const response = await apiClient.get('/restaurants/search', {
         params: { q: query },
       });
-      return response.data;
+      return response.data.restaurants || [];
     } catch (error) {
       console.error('Search restaurants error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
+  // GET /api/restaurants/<id> - Lấy chi tiết nhà hàng (bao gồm menu)
+  getById: async (id) => {
+    try {
+      const response = await apiClient.get(`/restaurants/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get restaurant detail error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // POST /api/search - Tìm kiếm nâng cao với filters
+  searchAdvanced: async (filters) => {
+    try {
+      const response = await apiClient.post('/search', filters);
+      return response.data.places || [];
+    } catch (error) {
+      console.error('Advanced search error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // POST /api/restaurants/details-by-ids - Lấy nhiều nhà hàng theo IDs
+  getDetailsByIds: async (ids) => {
+    try {
+      const response = await apiClient.post('/restaurants/details-by-ids', { ids });
+      return response.data.restaurants || [];
+    } catch (error) {
+      console.error('Get details by IDs error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // GET /api/restaurants/nearby - Tìm nhà hàng gần
   getNearby: async (latitude, longitude, radius = 5000) => {
     try {
-      const response = await apiClient.get('/food/restaurants/nearby', {
+      const response = await apiClient.get('/restaurants/nearby', {
         params: { latitude, longitude, radius },
       });
-      return response.data;
+      return response.data.restaurants || [];
     } catch (error) {
       console.error('Get nearby restaurants error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
+  // GET /api/restaurants/category/<id> - Lấy theo category
   getByCategory: async (categoryId) => {
     try {
-      const response = await apiClient.get(`/food/restaurants/category/${categoryId}`);
-      return response.data;
+      const response = await apiClient.get(`/restaurants/category/${categoryId}`);
+      return response.data.restaurants || [];
     } catch (error) {
       console.error('Get restaurants by category error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
-  getAllRestaurants: async (query = '') => {
+  // POST /api/direction - Lấy hướng dẫn
+  getDirections: async (origin, destination, mode = 'driving') => {
     try {
-      const endpoint = query ? `/food/restaurants/search?q=${query}` : '/food/restaurants';
-      const response = await apiClient.get(endpoint);
-      
-      return response.data.restaurants; 
-      
+      const response = await apiClient.post('/direction', {
+        origin,
+        destination,
+        mode,
+      });
+      return response.data;
     } catch (error) {
-      console.error('Get all restaurants error:', error);
+      console.error('Get directions error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
-      
-    getDetailsByIds: async (ids) => {
-        try {
-            const response = await apiClient.post('/food/restaurants/details-by-ids', { ids });
-            return response.data.restaurants; 
-        } catch (error) {
-            console.error('Get details by IDs error:', error);
-            throw error.response?.data || { error: error.message };
-        }
-    },
+
+  // Alias cho tiện dụng - dùng cho home screen
+  getAllRestaurants: async (query = '') => {
+    try {
+      if (query) {
+        return await restaurantAPI.searchSimple(query);
+      }
+      return await restaurantAPI.getAll();
+    } catch (error) {
+      console.error('Get all restaurants alias error:', error);
+      throw error;
+    }
+  },
 };
 
 // ============ FOOD/DISH ENDPOINTS ============
 export const foodAPI = {
-  getAll: async (filters = {}) => {
+  // GET /api/foods?limit=<limit>
+  getAll: async (limit = 50) => {
     try {
-      const response = await apiClient.get('/food/foods', { params: filters });
-      return response.data;
+      const response = await apiClient.get('/foods', {
+        params: { limit },
+      });
+      return response.data.foods || [];
     } catch (error) {
-      console.error('Get foods error:`', error);
+      console.error('Get foods error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
+  // GET /api/foods/<id>
   getById: async (id) => {
     try {
-      const response = await apiClient.get(`/food/foods/${id}`);
+      const response = await apiClient.get(`/foods/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get food error:', error);
@@ -361,32 +395,35 @@ export const foodAPI = {
     }
   },
 
+  // GET /api/foods/search?q=<query>
   search: async (query) => {
     try {
-      const response = await apiClient.get('/food/foods/search', {
+      const response = await apiClient.get('/foods/search', {
         params: { q: query },
       });
-      return response.data;
+      return response.data.foods || [];
     } catch (error) {
       console.error('Search foods error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
+  // GET /api/foods/category/<id>
   getByCategory: async (categoryId) => {
     try {
-      const response = await apiClient.get(`/food/foods/category/${categoryId}`);
-      return response.data;
+      const response = await apiClient.get(`/foods/category/${categoryId}`);
+      return response.data.foods || [];
     } catch (error) {
       console.error('Get foods by category error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
+  // GET /api/foods/restaurant/<id>
   getByRestaurant: async (restaurantId) => {
     try {
-      const response = await apiClient.get(`/food/foods/restaurant/${restaurantId}`);
-      return response.data;
+      const response = await apiClient.get(`/foods/restaurant/${restaurantId}`);
+      return response.data.foods || [];
     } catch (error) {
       console.error('Get foods by restaurant error:', error);
       throw error.response?.data || { error: error.message };
@@ -396,9 +433,10 @@ export const foodAPI = {
 
 // ============ FAVORITES ENDPOINTS ============
 export const favoriteAPI = {
+  // POST /api/favorite/toggle-restaurant (Authentication required)
   toggleRestaurantFavorite: async (restaurant_id) => {
     try {
-      const response = await apiClient.post('/user/favorite/toggle-restaurant', {
+      const response = await apiClient.post('/favorite/toggle-restaurant', {
         restaurant_id: String(restaurant_id), 
       });
       return response.data;
@@ -408,83 +446,29 @@ export const favoriteAPI = {
     }
   },
     
+  // GET /api/favorite/view (Authentication required)
   getAll: async () => {
     try {
-      const response = await apiClient.get('/user/favorite/view');
+      const response = await apiClient.get('/favorite/view');
       return response.data;
     } catch (error) {
       console.error('Get favorites error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
-  
-  add: async (foodId) => {
-    try {
-      const response = await apiClient.post('/favorites', { foodId });
-      return response.data;
-    } catch (error) {
-      console.error('Add favorite error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  remove: async (foodId) => {
-    try {
-      const response = await apiClient.delete(`/favorites/${foodId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Remove favorite error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  isFavorite: async (foodId) => {
-    try {
-      const response = await apiClient.get(`/favorites/${foodId}/check`);
-      return response.data;
-    } catch (error) {
-      console.error('Check favorite error:', error);
-      return false;
-    }
-  },
 };
 
 // ============ REVIEWS/RATINGS ENDPOINTS ============
 export const reviewAPI = {
-  // ⭐️ [MỚI] Hàm GET Rating nhanh ⭐️
-  getRating: async (restaurantId) => {
+  // POST /api/reviews (Authentication required)
+  create: async (target_id, rating, comment, type = 'restaurant') => {
     try {
-      const response = await apiClient.get(`/food/rating/${restaurantId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Get single rating error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  getByRestaurant: async (restaurantId) => {
-    try {
-      const response = await apiClient.get(`/food/reviews/restaurant/${restaurantId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Get restaurant reviews error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  getByFood: async (foodId) => {
-    try {
-      const response = await apiClient.get(`/food/reviews/food/${foodId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Get food reviews error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
-  create: async (reviewData) => {
-    try {
-      const response = await apiClient.post('/food/reviews', reviewData);
+      const response = await apiClient.post('/reviews', {
+        target_id: String(target_id),
+        rating: Number(rating),
+        comment,
+        type,
+      });
       return response.data;
     } catch (error) {
       console.error('Create review error:', error);
@@ -492,24 +476,24 @@ export const reviewAPI = {
     }
   },
 
-  update: async (id, reviewData) => {
+  // GET /api/reviews/restaurant/<id>
+  getByRestaurant: async (restaurantId) => {
     try {
-      const response = await apiClient.put(`/food/reviews/${id}`, reviewData);
-      return response.data;
+      const response = await apiClient.get(`/reviews/restaurant/${restaurantId}`);
+      return response.data.reviews || [];
     } catch (error) {
-      console.error('Update review error:', error);
+      console.error('Get restaurant reviews error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
-  delete: async (reviewId) => {
+  // GET /api/rating/<id>
+  getRating: async (restaurantId) => {
     try {
-      // Đảm bảo reviewId là chuỗi và đã được làm sạch
-      const cleanReviewId = String(reviewId).trim(); 
-      const response = await apiClient.delete(`/food/reviews/${cleanReviewId}`);
-      return response.data;
+      const response = await apiClient.get(`/rating/${restaurantId}`);
+      return response.data.rating || 0;
     } catch (error) {
-      console.error('Delete review error:', error);
+      console.error('Get rating error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
@@ -517,22 +501,54 @@ export const reviewAPI = {
 
 // ============ CATEGORIES ENDPOINTS ============
 export const categoryAPI = {
+  // GET /api/categories
   getAll: async () => {
     try {
       const response = await apiClient.get('/categories');
-      return response.data;
+      return response.data.categories || [];
     } catch (error) {
       console.error('Get categories error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
 
+  // GET /api/categories/<id>
   getById: async (id) => {
     try {
       const response = await apiClient.get(`/categories/${id}`);
       return response.data;
     } catch (error) {
       console.error('Get category error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+};
+
+// ============ MAP & ROUTING ENDPOINTS ============
+export const mapAPI = {
+  // POST /api/map/filter
+  filterMarkers: async (filters) => {
+    try {
+      const response = await apiClient.post('/map/filter', filters);
+      return response.data.places || [];
+    } catch (error) {
+      console.error('Filter markers error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // POST /api/get-route
+  getRoute: async (start_lat, start_lon, end_lat, end_lon) => {
+    try {
+      const response = await apiClient.post('/get-route', {
+        start_lat,
+        start_lon,
+        end_lat,
+        end_lon,
+      });
+      return response.data.coordinates || [];
+    } catch (error) {
+      console.error('Get route error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
@@ -586,7 +602,7 @@ export const chatbotAPI = {
 
   clearChatHistory: async () => {
     try {
-      const response = await apiClient.delete('/chatbot/history');
+      const response = await apiClient.delete('/chat/history');
       return response.data;
     } catch (error) {
       console.error('Clear chat history error:', error);
@@ -596,7 +612,7 @@ export const chatbotAPI = {
 
   getSuggestions: async () => {
     try {
-      const response = await apiClient.get('/chatbot/suggestions');
+      const response = await apiClient.get('/chat/suggestions');
       return response.data;
     } catch (error) {
       console.error('Get chatbot suggestions error:', error);
@@ -606,7 +622,7 @@ export const chatbotAPI = {
 
   searchByQuery: async (query) => {
     try {
-      const response = await apiClient.post('/chatbot/search', {
+      const response = await apiClient.post('/chat/search', {
         query,
       });
       return response.data;

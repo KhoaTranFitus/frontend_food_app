@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as Location from 'expo-location';
 
-const BACKEND_BASE_URL = 'http://192.168.1.2:5000/api';
+const BACKEND_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export default function MapScreen({ navigation, route }) {
   // ===== LOCATION & MAP STATE =====
@@ -103,7 +103,7 @@ export default function MapScreen({ navigation, route }) {
       }
     } catch (error) {
       console.error('❌ Backend filter error:', error.message);
-      Alert.alert('Lỗi kết nối', `Không thể kết nối đến server: ${error.message}\n\nKiểm tra:\n- Backend đang chạy tại http://192.168.1.2:5000\n- Firewall cho phép kết nối`);
+      Alert.alert('Lỗi kết nối', `Không thể kết nối đến server: ${error.message}`);
       setRestaurants([]);
     } finally {
       setLoadingRestaurants(false);
