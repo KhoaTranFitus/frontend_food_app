@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-// ⭐️ BỔ SUNG: Import Auth API ⭐️
-import { authAPI } from "../services/flaskApi"; 
+// ⭐️ BỔ SUNG: Import Auth API và User API ⭐️
+import { authAPI, userAPI } from "../services/flaskApi"; 
 
 export const AuthContext = createContext({
   isLoggedIn: false,
@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
   // Hàm TẢI PROFILE: Được gọi khi app khởi động và sau khi đăng nhập
   const loadUserProfile = async () => {
     try {
-      const userProfile = await authAPI.getProfile();
+      const userProfile = await userAPI.getProfile();
       setUser(userProfile); // Cập nhật state user
       setIsLoggedIn(true);
       await AsyncStorage.setItem("isLoggedIn", "true");

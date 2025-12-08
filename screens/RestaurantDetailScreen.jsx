@@ -214,17 +214,15 @@ export default function RestaurantDetailScreen({ route, navigation }) {
     }
     
     setIsSubmitting(true);
-
-    const reviewData = {
-        target_id: restaurantId,
-        type: 'restaurant',       
-        rating: userRating,
-        comment: userComment,
-    };
     
     try {
-        // Gọi API để gửi đánh giá
-        const result = await reviewAPI.create(reviewData); 
+        // Gọi API để gửi đánh giá với đúng thứ tự tham số
+        const result = await reviewAPI.create(
+            restaurantId,    // target_id
+            userRating,      // rating
+            userComment,     // comment
+            'restaurant'     // type
+        ); 
         
         // ⭐️ TẠO ĐỐI TƯỢNG REVIEW VỚI AVATAR VÀO LIST ⭐️
         const newReview = {
