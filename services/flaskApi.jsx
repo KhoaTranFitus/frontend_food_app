@@ -30,6 +30,9 @@ apiClient.interceptors.request.use(
       const token = await AsyncStorage.getItem('authToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log("🔑 Token added to request:", token.substring(0, 20) + "...");
+      } else {
+        console.warn("⚠️ No token found in AsyncStorage for request:", config.url);
       }
     } catch (error) {
       console.warn('Error getting token:', error);
@@ -115,6 +118,17 @@ export const authAPI = {
       const token = response.data?.idToken || response.data?.token;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
+        console.log("✅ Token saved to AsyncStorage");
+        
+        // Verify token was saved
+        const savedToken = await AsyncStorage.getItem('authToken');
+        if (savedToken) {
+          console.log("✅ Token verified in storage");
+        } else {
+          console.error("❌ Token NOT found after save!");
+        }
+      } else {
+        console.warn("⚠️ No token in login response");
       }
 
       // LƯU THÔNG TIN USER (QUAN TRỌNG ĐỂ PROFILE HIỂN THỊ)
