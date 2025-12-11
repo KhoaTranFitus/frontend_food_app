@@ -494,7 +494,8 @@ export const reviewAPI = {
   getByRestaurant: async (restaurantId) => {
     try {
       const response = await apiClient.get(`/reviews/restaurant/${restaurantId}`);
-      return response.data.reviews || [];
+      // DÒNG NÀY ĐÃ ĐƯỢC CHỈNH SỬA: Trả về toàn bộ data để lấy current_rating
+      return response.data; 
     } catch (error) {
       console.error('Get restaurant reviews error:', error);
       throw error.response?.data || { error: error.message };
@@ -511,6 +512,17 @@ export const reviewAPI = {
       throw error.response?.data || { error: error.message };
     }
   },
+  
+  // DELETE /api/reviews/<review_id>
+  delete: async (reviewId) => {
+    try {
+      const response = await apiClient.delete(`/reviews/${reviewId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete review error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  }
 };
 
 // ============ CATEGORIES ENDPOINTS ============

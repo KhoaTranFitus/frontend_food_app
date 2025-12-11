@@ -117,7 +117,9 @@ export default function RestaurantDetailScreen({ route, navigation }) {
 
           // 2. ⭐️ CẬP NHẬT ĐIỂM RATING TỪ PHẢN HỒI BACKEND (current_rating) ⭐️
           if (result.current_rating !== undefined && result.current_rating !== null) {
-              setCurrentRating(parseFloat(result.current_rating));
+              const fetchedRating = parseFloat(result.current_rating);
+              setCurrentRating(fetchedRating);
+              console.log("✅ RATING TỪ SERVER:", fetchedRating); 
           }
           
       } catch (e) {
@@ -244,7 +246,9 @@ export default function RestaurantDetailScreen({ route, navigation }) {
         // CẬP NHẬT ĐIỂM RATING TỪ PHẢN HỒI BACKEND
         const newRating = result.review.new_restaurant_rating;
         if (newRating !== undefined && newRating !== null) {
-            setCurrentRating(parseFloat(newRating));
+            const finalNewRating = parseFloat(newRating);
+            setCurrentRating(finalNewRating);
+            console.log("✅ RATING TỪ POST (CẬP NHẬT LOCAL):", finalNewRating);
         }
         
         // Reset form
