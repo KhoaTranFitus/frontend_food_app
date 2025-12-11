@@ -18,7 +18,7 @@ export default function MapScreen({ navigation, route }) {
   const [loadingRestaurants, setLoadingRestaurants] = useState(false);
 
   // ===== FILTER STATE (sent to backend) =====
-  const [filterRadius, setFilterRadius] = useState(2); // km - default 2km radius
+  const [filterRadius, setFilterRadius] = useState(5); // km - default 5km radius (tăng từ 2km để dễ tìm)
   const [filterCategories, setFilterCategories] = useState([]); // Category IDs: [1,2,3,4,5]
   const [filterMinPrice, setFilterMinPrice] = useState(null);
   const [filterMaxPrice, setFilterMaxPrice] = useState(null);
@@ -95,8 +95,17 @@ export default function MapScreen({ navigation, route }) {
       });
 
       if (response.data.success) {
-        console.log(`✅ Received ${response.data.total} restaurants from backend`);
-        setRestaurants(response.data.places || []);
+        console.log(`✅ MapScreen: Received ${response.data.total} restaurants from LOCAL backend data`);
+        console.log('📊 Debug stats:', response.data.debug_stats);
+        
+        if (response.data.places && response.data.places.length > 0) {
+          console.log('🏆 First result:', response.data.places[0].name);
+          console.log('🗺️ MapScreen: Setting restaurants state to render markers');
+          setRestaurants(response.data.places || []);
+        } else {
+          console.warn('⚠️ No restaurants found. Try increasing radius or changing filters.');
+          setRestaurants([]);
+        }
       } else {
         Alert.alert('Lỗi', response.data.message || 'Không thể lấy danh sách nhà hàng');
         setRestaurants([]);
@@ -166,12 +175,14 @@ export default function MapScreen({ navigation, route }) {
   // ===== LIFECYCLE: Initialize location + fetch restaurants =====
   useEffect(() => {
     (async () => {
+      console.log('📍 MapScreen: Requesting location permission...');
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Lỗi', 'Quyền truy cập vị trí bị từ chối');
         return;
       }
 
+      console.log('📍 MapScreen: Getting current position...');
       let { coords } = await Location.getCurrentPositionAsync({});
       const userRegion = {
         latitude: coords.latitude,
@@ -179,16 +190,18 @@ export default function MapScreen({ navigation, route }) {
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
       };
+      console.log('✅ MapScreen: User location set:', userRegion);
       setUserLocation(userRegion);
     })();
   }, []);
 
-  // Fetch restaurants whenever any filter changes
+  // Fetch restaurants whenever any filter changes OR when userLocation is first set
   useEffect(() => {
     if (userLocation) {
+      console.log('🔄 MapScreen: Fetching restaurants with filters...');
       fetchFilteredLocations();
     }
-  }, [filterRadius, filterMinPrice, filterMaxPrice, filterMinRating, filterMaxRating, filterTags, chkDry, chkSoup, chkVegetarian, chkSalty, chkSeafood]);
+  }, [userLocation, filterRadius, filterMinPrice, filterMaxPrice, filterMinRating, filterMaxRating, filterTags, chkDry, chkSoup, chkVegetarian, chkSalty, chkSeafood]);
 
   // ===== LISTEN FOR DESTINATION FROM RESTAURANT DETAIL =====
   /**
@@ -298,6 +311,10 @@ export default function MapScreen({ navigation, route }) {
           style={styles.map}
           initialRegion={userLocation}
           showsUserLocation={true}
+          showsPointsOfInterest={false}
+          showsBuildings={false}
+          showsIndoors={false}
+          showsTraffic={false}
         >
           <Marker coordinate={userLocation} title="Vị trí của bạn" />
           {destination && <Marker coordinate={destination} title="Điểm đến" pinColor="red" />}
