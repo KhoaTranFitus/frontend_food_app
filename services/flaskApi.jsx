@@ -6,7 +6,7 @@ import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://172.20.10.5:5000/api'; 
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.22:5000/api'; 
 
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
