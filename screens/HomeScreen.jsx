@@ -1,4 +1,4 @@
-﻿// screens/HomeScreen.jsx
+// screens/HomeScreen.jsx
 import React, { useEffect, useState, useRef } from "react";
 import Animated from "react-native-reanimated";
 import {
@@ -33,72 +33,73 @@ import { useHeaderAnimation } from "../hooks/useHeaderAnimation";
 
 // NEW: Define province constants for state management (from FilterDropdown)
 const ALL_PROVINCES = [
-  { id: '', label: 'Gần tôi' },
+  { id: 'near_me', label: 'Gần tôi' },
   // ===== THÀNH PHỐ LỚN =====
-  { id: 'hcm', label: 'TP Hồ Chí Minh' },
-  { id: 'hanoi', label: 'Hà Nội' },
-  { id: 'danang', label: 'Đà Nẵng' },
-  { id: 'haiPhong', label: 'Hải Phòng' },
-  { id: 'cantho', label: 'Cần Thơ' },
+  { id: 'Ho Chi Minh', label: 'TP Hồ Chí Minh' },
+  { id: 'Ha Noi', label: 'Hà Nội' },
+  { id: 'Da Nang', label: 'Đà Nẵng' },
+  { id: 'Hai Phong', label: 'Hải Phòng' },
+  { id: 'Can Tho', label: 'Cần Thơ' },
 
   // ===== ĐIỂM DU LỊCH NỔI BẬT =====
-  { id: 'lamDong', label: 'Lâm Đồng' },
-  { id: 'khanhhoa', label: 'Khánh Hòa' },
-  { id: 'binhDinh', label: 'Bình Định' },
-  { id: 'quangNinh', label: 'Quảng Ninh' },
-  { id: 'thuaThienHue', label: 'Thừa Thiên Huế' },
-  { id: 'quangBinh', label: 'Quảng Bình' },
-  { id: 'ninhBinh', label: 'Ninh Bình' },
-  { id: 'phuYen', label: 'Phú Yên' },
-  { id: 'baRiaVungTau', label: 'Bà Rịa - Vũng Tàu' },
-  { id: 'kienGiang', label: 'Kiên Giang' },
-  { id: 'quangNam', label: 'Quảng Nam' },
+  { id: 'Lam Dong', label: 'Lâm Đồng' },
+  { id: 'Khanh Hoa', label: 'Khánh Hòa' },
+  { id: 'Binh Dinh', label: 'Bình Định' },
+  { id: 'Quang Ninh', label: 'Quảng Ninh' },
+  { id: 'Thua Thien Hue', label: 'Thừa Thiên Huế' },
+  { id: 'Quang Binh', label: 'Quảng Bình' },
+  { id: 'Ninh Binh', label: 'Ninh Bình' },
+  { id: 'Phu Yen', label: 'Phú Yên' },
+  { id: 'Ba Ria Vung Tau', label: 'Bà Rịa - Vũng Tàu' },
+  { id: 'Kien Giang', label: 'Kiên Giang' },
+  { id: 'Quang Nam', label: 'Quảng Nam' },
 
   // ===== DANH SÁCH CÒN LẠI (A → Z) =====
-  { id: 'anGiang', label: 'An Giang' },
-  { id: 'bacGiang', label: 'Bắc Giang' },
-  { id: 'bacKan', label: 'Bắc Kạn' },
-  { id: 'bacLieu', label: 'Bạc Liêu' },
-  { id: 'bacNinh', label: 'Bắc Ninh' },
-  { id: 'benTre', label: 'Bến Tre' },
-  { id: 'binhDuong', label: 'Bình Dương' },
-  { id: 'binhPhuoc', label: 'Bình Phước' },
-  { id: 'binhThuan', label: 'Bình Thuận' },
-  { id: 'caMau', label: 'Cà Mau' },
-  { id: 'caoBang', label: 'Cao Bằng' },
-  { id: 'dakLak', label: 'Đắk Lắk' },
-  { id: 'dakNong', label: 'Đắk Nông' },
-  { id: 'dienBien', label: 'Điện Biên' },
-  { id: 'dongNai', label: 'Đồng Nai' },
-  { id: 'dongThap', label: 'Đồng Tháp' },
-  { id: 'giaLai', label: 'Gia Lai' },
-  { id: 'haGiang', label: 'Hà Giang' },
-  { id: 'haNam', label: 'Hà Nam' },
-  { id: 'haTinh', label: 'Hà Tĩnh' },
-  { id: 'hauGiang', label: 'Hậu Giang' },
-  { id: 'hoaBinh', label: 'Hòa Bình' },
-  { id: 'hungYen', label: 'Hưng Yên' },
-  { id: 'konTum', label: 'Kon Tum' },
-  { id: 'langSon', label: 'Lạng Sơn' },
-  { id: 'laoCai', label: 'Lào Cai' },
-  { id: 'longAn', label: 'Long An' },
-  { id: 'namDinh', label: 'Nam Định' },
-  { id: 'nghean', label: 'Nghệ An' },
-  { id: 'ninhThuan', label: 'Ninh Thuận' },
-  { id: 'phuTho', label: 'Phú Thọ' },
-  { id: 'quangNgai', label: 'Quảng Ngãi' },
-  { id: 'quangTri', label: 'Quảng Trị' },
-  { id: 'socTrang', label: 'Sóc Trăng' },
-  { id: 'sonLa', label: 'Sơn La' },
-  { id: 'taylor', label: 'Tây Ninh' },
-  { id: 'thaiBinh', label: 'Thái Bình' },
-  { id: 'thaiNguyen', label: 'Thái Nguyên' },
-  { id: 'tienGiang', label: 'Tiền Giang' },
-  { id: 'traVinh', label: 'Trà Vinh' },
-  { id: 'tuyenQuang', label: 'Tuyên Quang' },
-  { id: 'vinhLong', label: 'Vĩnh Long' },
-  { id: 'vinhPhuc', label: 'Vĩnh Phúc' },
-  { id: 'yenBai', label: 'Yên Bái' },
+  { id: 'An Giang', label: 'An Giang' },
+  { id: 'Bac Giang', label: 'Bắc Giang' },
+  { id: 'Bac Kan', label: 'Bắc Kạn' },
+  { id: 'Bac Lieu', label: 'Bạc Liêu' },
+  { id: 'Bac Ninh', label: 'Bắc Ninh' },
+  { id: 'Ben Tre', label: 'Bến Tre' },
+  { id: 'Binh Duong', label: 'Bình Dương' },
+  { id: 'Binh Phuoc', label: 'Bình Phước' },
+  { id: 'Binh Thuan', label: 'Bình Thuận' },
+  { id: 'Ca Mau', label: 'Cà Mau' },
+  { id: 'Cao Bang', label: 'Cao Bằng' },
+  { id: 'Dak Lak', label: 'Đắk Lắk' },
+  { id: 'Dak Nong', label: 'Đắk Nông' },
+  { id: 'Dien Bien', label: 'Điện Biên' },
+  { id: 'Dong Nai', label: 'Đồng Nai' },
+  { id: 'Dong Thap', label: 'Đồng Tháp' },
+  { id: 'Gia Lai', label: 'Gia Lai' },
+  { id: 'Ha Giang', label: 'Hà Giang' },
+  { id: 'Ha Nam', label: 'Hà Nam' },
+  { id: 'Ha Tinh', label: 'Hà Tĩnh' },
+  { id: 'Hau Giang', label: 'Hậu Giang' },
+  { id: 'Hoa Binh', label: 'Hòa Bình' },
+  { id: 'Hung Yen', label: 'Hưng Yên' },
+  { id: 'Kon Tum', label: 'Kon Tum' },
+  { id: 'Lang Son', label: 'Lạng Sơn' },
+  { id: 'Lao Cai', label: 'Lào Cai' },
+  { id: 'Long An', label: 'Long An' },
+  { id: 'Nam Dinh', label: 'Nam Định' },
+  { id: 'Nghe An', label: 'Nghệ An' },
+  { id: 'Ninh Thuan', label: 'Ninh Thuận' },
+  { id: 'Phu Tho', label: 'Phú Thọ' },
+  { id: 'Quang Ngai', label: 'Quảng Ngãi' },
+  { id: 'Quang Tri', label: 'Quảng Trị' },
+  { id: 'Soc Trang', label: 'Sóc Trăng' },
+  { id: 'Son La', label: 'Sơn La' },
+  { id: 'Tay Ninh', label: 'Tây Ninh' },
+  { id: 'Thai Binh', label: 'Thái Bình' },
+  { id: 'Thai Nguyen', label: 'Thái Nguyên' },
+  { id: 'Tien Giang', label: 'Tiền Giang' },
+  { id: 'Tra Vinh', label: 'Trà Vinh' },
+  { id: 'Tuyen Quang', label: 'Tuyên Quang' },
+  { id: 'Vinh Long', label: 'Vĩnh Long' },
+  { id: 'Vinh Phuc', label: 'Vĩnh Phúc' },
+  { id: 'Yen Bai', label: 'Yên Bái' },
+  { id: 'Thanh Hoa', label: 'Thanh Hóa' },
 ];
 
 const PROVINCE_MAP = ALL_PROVINCES.reduce((acc, p) => {
@@ -109,18 +110,18 @@ const PROVINCE_MAP = ALL_PROVINCES.reduce((acc, p) => {
 export default function HomeScreen({ navigation, route }) {
   const [query, setQuery] = useState("");
   const [places, setPlaces] = useState([]);
-  const [userLoc, setUserLoc] = useState(null); // User's actual GPS
+  const [userLoc, setUserLoc] = useState(null);
   const [dropdownVisible, setDropdownVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const mapRef = useRef(null);
   const { handleScroll, headerAnimatedStyle } = useHeaderAnimation();
 
-  // ⭐️ LOCATION STATE ⭐️
-  const [selectedProvinceId, setSelectedProvinceId] = useState(""); // Default: use GPS when available
+  // ⭐️ UPDATED: Mặc định là "Gần tôi" (near_me) ⭐️
+  const [selectedProvinceId, setSelectedProvinceId] = useState("near_me");
   const [selectedProvinceName, setSelectedProvinceName] = useState("Gần tôi");
-  const [searchLocation, setSearchLocation] = useState(null); // The actual coordinates used for search
-  const [searchMode, setSearchMode] = useState("nearby"); // "default" | "category" | "text"
+  const [searchLocation, setSearchLocation] = useState(null);
+  const [searchMode, setSearchMode] = useState("nearby");
   const categories = [
     { name: "Món mặn", icon: require("../assets/beef.jpg") },
     { name: "Món nước", icon: require("../assets/burger.png") },
@@ -142,7 +143,7 @@ export default function HomeScreen({ navigation, route }) {
   //   try {
   //     const normalized = await searchByProvince(provinceId);
   //     setPlaces(normalized);
-    //   } catch (err) {
+  //   } catch (err) {
   //     console.warn('Filter search error', err);
   //     setPlaces([]);
   //   } finally {
@@ -153,33 +154,42 @@ export default function HomeScreen({ navigation, route }) {
   // ⭐️ THAY THẾ LOGIC TẢI DỮ LIỆU BAN ĐẦU ⭐️
   // ⭐️ MODIFIED: Centralized location and search logic + Map animation ⭐️
   const handleFilterSelect = async (provinceId) => {
-    // 1. Chuan hoa 'near_me' -> '' (dung GPS), cap nhat UI Dropdown
-    const normalizedId = provinceId === 'near_me' ? '' : provinceId;
-    const provinceLabel = normalizedId ? (PROVINCE_MAP[normalizedId] || ALL_PROVINCES[0].label) : 'Gần tôi';
+    // 1. KHÔNG CHUẨN HÓA: Giữ nguyên provinceId (bao gồm cả 'near_me')
+    const isNearMe = provinceId === 'near_me';
+    const normalizedId = provinceId; // Giữ nguyên 'near_me' hoặc ID tỉnh
+    // Xác định tên/nhãn hiển thị trên UI
+    const provinceLabel = isNearMe
+      ? 'Gần tôi'
+      : (PROVINCE_MAP[normalizedId] || ALL_PROVINCES[0].label);
+
+    // Cập nhật State UI
     setSelectedProvinceId(normalizedId);
     setSelectedProvinceName(provinceLabel);
     setDropdownVisible(false);
     setLoading(true);
-    const nextMode = query?.trim() ? "full" : "nearby";
+
+    // Chế độ tìm kiếm: 'nearby' nếu là 'near_me' VÀ không có query,
+    // hoặc 'full' nếu có query tìm kiếm.
+    const nextMode = (isNearMe && !query?.trim()) ? "nearby" : "full";
     setSearchMode(nextMode);
 
     try {
-      // 2. Lấy tọa độ trung tâm MỚI (User GPS hoặc Tỉnh)
+      // 2. Lấy tọa độ trung tâm MỚI 
+      // (Hàm getSearchLocation cần được chỉnh sửa để chấp nhận 'near_me'
+      // hoặc kiểm tra nếu provinceId không phải ID tỉnh, thì dùng userLoc)
       const newSearchLoc = await getSearchLocation(normalizedId, userLoc);
       setSearchLocation(newSearchLoc);
 
       // 3. Tìm kiếm nhà hàng xung quanh tọa độ MỚI đó
       const results = await searchRestaurants({
-        query: query || "", // Giữ query cũ nếu có, hoặc mặc định food
-        provinceId: normalizedId,
+        query: query || "",
+        provinceId: isNearMe ? null : normalizedId, // Truyền NULL/undefined nếu là 'near_me'
         provinceName: provinceLabel,
-        userLoc: userLoc, // Truyền userLoc để hàm service xử lý logic
+        userLoc: userLoc,
         radius: nextMode === "nearby" ? 2000 : null,
       });
 
       setPlaces(results);
-
-      // Lưu ý: Map sẽ tự animate nhờ useEffect bên trong MapSection
     } catch (err) {
       console.warn('Filter search error:', err);
       setPlaces([]);
@@ -192,22 +202,50 @@ export default function HomeScreen({ navigation, route }) {
   useEffect(() => {
     (async () => {
       setLoading(true);
-      // Lấy vị trí người dùng (chỉ để truyền tham số, không còn dùng cho TomTom)
+
+      // Lấy vị trí người dùng
       const { status } = await Location.requestForegroundPermissionsAsync();
+      let userLocation = null;
+
       if (status === "granted") {
-        const loc = await Location.getCurrentPositionAsync({});
-        // Lưu vị trí người dùng
-        setUserLoc({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        try {
+          const loc = await Location.getCurrentPositionAsync({});
+          userLocation = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude
+          };
+          setUserLoc(userLocation);
+          console.log('✅ Got user location:', userLocation);
+        } catch (e) {
+          console.warn('⚠️ Error getting location:', e);
+        }
       }
-      
-      // ⭐️ GỌI API THẬT ĐỂ LẤY DỮ LIỆU BAN ĐẦU ⭐️
+
+      // ⭐️ TỰ ĐỘNG LOAD "GẦN TÔI" (2km) ⭐️
       try {
-          const data = await restaurantAPI.getAllRestaurants();
-          setPlaces(data || []);
+        console.log('🔍 Loading initial "Gần tôi" results...');
+
+        const searchLoc = await getSearchLocation("near_me", userLocation);
+        setSearchLocation(searchLoc);
+
+        // Gọi search với radius 2km
+        const results = await searchRestaurants({
+          query: "", // Query trống
+          provinceId: "near_me",
+          provinceName: "Gần tôi",
+          userLoc: userLocation,
+          radius: 2000, // 2km mặc định
+        });
+
+        console.log(`✅ Loaded ${results?.length || 0} restaurants near you`);
+        setPlaces(results || []);
+        setSearchMode("nearby");
+
       } catch (e) {
-          console.error("Initial load error:", e);
-          setPlaces([]);
+        console.error("❌ Initial load error:", e);
+        setPlaces([]);
       }
+
       setLoading(false);
     })();
   }, []);
@@ -223,83 +261,52 @@ export default function HomeScreen({ navigation, route }) {
 
 
   // ⭐️ THAY THẾ LOGIC TÌM KIẾM ⭐️
+  // ⭐️ MODIFIED: doSearch - Luôn tính radius dựa vào query ⭐️
   const doSearch = async (text, fromCategory = false) => {
     setQuery(text);
     setLoading(true);
 
-    // Nếu search text rỗng → ưu tiên Nearby mode
-    const nextMode = text?.trim() ? "full" : "nearby";
-    setSearchMode(nextMode);
-
     try {
-      let mapped = [];
+      const hasQuery = text && text.trim().length > 0;
 
-      // =============================
-      // 1. Nếu bấm danh mục → ƯU TIÊN LỌC CATEGORY
-      // =============================
-      if (fromCategory === true) {
-        mapped = await searchRestaurants({
-          query: null,
-          category: text,
-          provinceId: selectedProvinceId,
-          provinceName: selectedProvinceName,
-          userLoc: userLoc,
-          radius: nextMode === "nearby" ? 2000 : null,
-        });
-      }
+      // ⭐️ LOGIC RADIUS (CHỈ 2 TRƯỜNG HỢP):
+      // - Có query → 5000m
+      // - Query rỗng → 2000m
+      const finalRadius = hasQuery ? 5000 : 2000;
 
-      // =============================
-      // 2. TÌM KIẾM THEO TỈNH (nếu đang chọn tỉnh)
-      // =============================
-      else if (selectedProvinceId || selectedProvinceName) {
-        mapped = await searchRestaurants({
-          query: text,
-          provinceId: selectedProvinceId,
-          provinceName: selectedProvinceName,
-          userLoc: null,
-          radius: null,
-        });
-      }
+      console.log(`🔎 doSearch: text="${text}", hasQuery=${hasQuery}, finalRadius=${finalRadius}m`);
 
-      // =============================
-      // 3. TÌM KIẾM GẦN ĐÂY (nếu chế độ near me)
-      // =============================
-      else if (nextMode === "nearby" && userLoc) {
-        mapped = await searchRestaurants({
-          query: text,
-          userLoc: userLoc,
-          radius: 2000,
-        });
-      }
+      // Gọi searchRestaurants
+      const mapped = await searchRestaurants({
+        query: text || "",
+        provinceId: selectedProvinceId || "near_me",
+        provinceName: selectedProvinceName,
+        userLoc: userLoc,
+        radius: finalRadius,
+      });
 
-      // =============================
-      // 4. FALLBACK → lấy tất cả (GGMap logic)
-      // =============================
-      else {
-        mapped = await restaurantAPI.getAllRestaurants(text);
-      }
-
-      // =============================
-      // UPDATE PLACE LIST
-      // =============================
+      console.log(`✅ doSearch got ${mapped?.length || 0} results`);
       setPlaces(mapped);
 
-      // =============================
-      // ANIMATE MAP
-      // =============================
-      if (mapRef.current && mapped?.length > 0) {
-        const first = mapped[0];
-        if (first.lat && first.lon) {
+      // ⭐️ ANIMATE MAP LOGIC ⭐️
+      if (mapRef.current && mapped && mapped.length > 0) {
+        const centerLat = searchLocation?.latitude;
+        const centerLon = searchLocation?.longitude;
+
+        if (centerLat && centerLon) {
+          console.log(`🗺️ Animating map to center: [${centerLat}, ${centerLon}]`);
           mapRef.current.animateToRegion(
             {
-              latitude: first.lat,
-              longitude: first.lon,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
+              latitude: centerLat,
+              longitude: centerLon,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
             },
-            450
+            500
           );
         }
+      } else if (mapRef.current && (!mapped || mapped.length === 0)) {
+        console.warn("⚠️ Không có kết quả tìm kiếm để hiển thị trên map");
       }
     } catch (e) {
       console.warn("doSearch error:", e);
@@ -307,29 +314,29 @@ export default function HomeScreen({ navigation, route }) {
     } finally {
       setLoading(false);
     }
-  };  
+  };
 
   // xử lí cái danh mục
   const handleCategoryPress = (name) => {
     setSelectedCategory(name);
     doSearch(name);
   };
-  
+
   // ⭐️ THÊM HÀM REFRESH MỚI ⭐️
   const handleRefresh = async () => {
     setLoading(true);
     try {
-        // Tải lại toàn bộ danh sách (không query, không lọc)
-        const data = await restaurantAPI.getAllRestaurants();
-        setPlaces(data);
+      // Tải lại toàn bộ danh sách (không query, không lọc)
+      const data = await restaurantAPI.getAllRestaurants();
+      setPlaces(data);
     } catch (e) {
-        console.error("Refresh error:", e);
-        setPlaces([]);
+      console.error("Refresh error:", e);
+      setPlaces([]);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   }
-  
+
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -366,21 +373,21 @@ export default function HomeScreen({ navigation, route }) {
             <RefreshControl
               refreshing={loading}
               onRefresh={handleRefresh} // ⭐️ SỬ DỤNG HÀM REFRESH MỚI ⭐️
-//               onRefresh={async () => {
-//                 setLoading(true);
-//                 const mode = query?.trim() ? "full" : "nearby";
-//                 setSearchMode(mode);
-//                 // Use current selected province ID and userLoc for refresh
-//                 const data = await searchRestaurants({
-//                   query: query || "",
-//                   provinceId: selectedProvinceId,
-//                   provinceName: selectedProvinceName,
-//                   userLoc: userLoc,
-//                   radius: mode === "nearby" ? 2000 : null,
-//                 });
-//                 setPlaces(data);
-//                 setLoading(false);
-//               }}
+              //               onRefresh={async () => {
+              //                 setLoading(true);
+              //                 const mode = query?.trim() ? "full" : "nearby";
+              //                 setSearchMode(mode);
+              //                 // Use current selected province ID and userLoc for refresh
+              //                 const data = await searchRestaurants({
+              //                   query: query || "",
+              //                   provinceId: selectedProvinceId,
+              //                   provinceName: selectedProvinceName,
+              //                   userLoc: userLoc,
+              //                   radius: mode === "nearby" ? 2000 : null,
+              //                 });
+              //                 setPlaces(data);
+              //                 setLoading(false);
+              //               }}
 
               colors={["#ff6347"]}
             />
