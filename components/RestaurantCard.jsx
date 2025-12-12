@@ -21,7 +21,7 @@ export default function RestaurantCard({ item, index }) {
           style={styles.card}
         >
           <MotiImage
-            source={require('../assets/amthuc.jpg')}
+            source={{ uri: item.image || item.image_url || item.photo || item.photos?.[0] }}
             style={styles.img}
             from={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

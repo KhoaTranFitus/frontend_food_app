@@ -7,7 +7,8 @@ import { getRoute } from '../services/tomtomApi.jsx';
 import { Ionicons } from '@expo/vector-icons';
 // BỔ SUNG IMPORTS: useAuth, favoriteAPI VÀ reviewAPI
 import { useAuth } from '../context/AuthContext'; 
-import { favoriteAPI, reviewAPI } from '../services/flaskApi'; 
+import { foodAPI, favoriteAPI, reviewAPI } from '../services/flaskApi';
+
 
 
 // ⭐️ ĐỊNH NGHĨA MÀU SẮC (Đồng bộ) ⭐️
@@ -37,13 +38,6 @@ const getDeterministicAvatarColor = (userId) => {
     return AVATAR_COLORS[index];
 };
 
-
-const MENU_IMAGES = [
-  { id: "1", name: "Beef Wellington", image: require("../assets/beef.jpg") },
-  { id: "2", name: "Cơm Tấm", image: require("../assets/comtam.jpg") },
-  { id: "3", name: "Bún Cá Cay", image: require("../assets/buncacay.jpg") }, 
-  { id: "4", name: "Capuchino", image: require("../assets/coffee.jpg") },
-];
 
 // ⭐️ COMPONENT NÚT TIM NỔI (OVERLAY) ⭐️
 const FavoriteButton = ({ isFavorited, onToggle, loading }) => (
@@ -89,6 +83,8 @@ export default function RestaurantDetailScreen({ route, navigation }) {
   const [loadingFavorite, setLoadingFavorite] = useState(false); 
   
   const [reviews, setReviews] = useState([]); 
+  const [menu, setMenu] = useState([]);
+  const [loadingMenu, setLoadingMenu] = useState(true);
   const [userRating, setUserRating] = useState(0); 
   const [userComment, setUserComment] = useState(''); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
@@ -148,7 +144,21 @@ export default function RestaurantDetailScreen({ route, navigation }) {
     })();
   }, [restaurantId, fetchReviews]); // Thêm fetchReviews làm dependency
 
+  useEffect(() => {
+    const loadMenu = async () => {
+      try {
+        const res = await foodAPI.getByRestaurant(restaurantId);
+        setMenu(res);
+      } catch (err) {
+        console.log("Error loading menu:", err);
+        setMenu([]);
+      } finally {
+        setLoadingMenu(false);
+      }
+    };
 
+    loadMenu();
+  }, [restaurantId]);
   
   // Đồng bộ trạng thái isFavorite với state user khi nó thay đổi
   useEffect(() => {
@@ -429,7 +439,7 @@ export default function RestaurantDetailScreen({ route, navigation }) {
         />
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-            <Image source={item?.image || require('../assets/amthuc.jpg')} style={styles.headerImage} />
+            <Image source={{ uri: item.image || item.image_url || item.photo || item.photos?.[0] }} style={styles.headerImage} />
 
             <View style={styles.content}>
                 <View style={styles.titleRow}>
@@ -451,15 +461,22 @@ export default function RestaurantDetailScreen({ route, navigation }) {
                 {/* MENU */}
                 <View style={styles.menuSection}>
                     <Text style={styles.menuHeader}>Menu</Text>
-                    <FlatList
-                      data={MENU_IMAGES} 
-                      keyExtractor={(i) => i.id}
-                      numColumns={2}
-                      columnWrapperStyle={styles.menuRow}
-                      showsVerticalScrollIndicator={false}
-                      scrollEnabled={false}
-                      renderItem={renderMenuItem}
-                    />
+                    {loadingMenu ? (
+                      <ActivityIndicator size="large" color={COLORS.ACCENT} />
+                    ) : (
+                      <FlatList
+                        data={menu}
+                        keyExtractor={(item) => item.id.toString()}
+                        scrollEnabled={false}
+                        renderItem={({ item }) => (
+                          <View style={styles.menuItem}>
+                            <Text style={styles.menuFoodName}>{item.dish_name}</Text>
+                            <Text style={styles.menuPrice}>{item.price.toLocaleString()} đ</Text>
+                            <Text style={styles.menuDesc}>{item.description}</Text>
+                          </View>
+                        )}
+                      />
+                    )}
                 </View>
                 
                 {/* BẢN ĐỒ */}
@@ -537,233 +554,257 @@ export default function RestaurantDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.CARD_BACKGROUND,
-  },
-  scrollContent: {
-    paddingBottom: 50, 
-  },
-  // ⭐️ STYLE ĐÃ SỬA: BACK BUTTON ⭐️
-  backButton: {
-    position: 'absolute',
-    top: 60, // Cố định vị trí
-    left: 15, 
-    borderRadius: 20,
-    padding: 5,
-    zIndex: 100,
-  },
-  // ⭐️ STYLE ĐÃ SỬA: FAVORITE BUTTON ⭐️
-  favoriteButton: {
-    position: 'absolute', 
-    top: 60, // Cố định vị trí
-    right: 5, // Đặt ở góc phải
-    padding: 8,
-    borderRadius: 20,
-    zIndex: 100,
-  },
-  headerImage: { width: '100%', height: 220 },
-  content: {
-    padding: 16,
-    backgroundColor: COLORS.CARD_BACKGROUND,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: -20,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start', // Chỉ cần flex-start vì nút tim đã ở absolute
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  title: { fontSize: 24, fontWeight: '800', color: COLORS.PRIMARY_TEXT }, 
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  ratingText: {},
-  sub: { 
-    color: COLORS.SECONDARY_TEXT, 
-    marginTop: 6,
-    marginLeft: 5, 
-  },
-  cta: {
-    marginTop: 16,
-    backgroundColor: COLORS.ACCENT,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  ctaText: {
-    color: COLORS.CARD_BACKGROUND,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  menuSection: {
-    marginTop: 20,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-  },
-  menuHeader: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.PRIMARY_TEXT,
-    marginBottom: 10,
-  },
-  menuRow: {
-    justifyContent: 'space-between',
-  },
-  menuCard: {
-    width: '48%',
-    backgroundColor: '#F7F7F7',
-    borderRadius: 10,
-    marginBottom: 10,
-    alignItems: 'center',
-    paddingBottom: 10,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-  },
-  menuImage: {
-    width: '100%',
-    height: 100,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
-    marginBottom: 5,
+  menuItem: {
+  paddingVertical: 16,
+  paddingHorizontal: 8,
+  borderBottomWidth: 1,
+  borderColor: '#E0E0E0',
+  marginBottom: 12,
   },
   menuFoodName: {
-    fontWeight: '600',
-    color: COLORS.PRIMARY_TEXT,
-  },
-  mapSection: {
-    marginTop: 20,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-  },
-  mapHeader: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.PRIMARY_TEXT,
-    marginBottom: 10,
-  },
-  map: {
-    width: '100%',
-    height: 300,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  reviewSection: {
-    marginTop: 20,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-  },
-  reviewHeader: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.PRIMARY_TEXT,
-    marginBottom: 10,
-  },
-  ratingForm: {
-    marginBottom: 20,
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    backgroundColor: '#F0F8FF',
-  },
-  formLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.PRIMARY_TEXT,
-    marginTop: 10,
-    marginBottom: 5,
-  },
-  starContainer: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  star: {
-    fontSize: 28,
-    marginRight: 5,
-  },
-  commentInput: {
-    height: 80,
-    borderColor: COLORS.BORDER,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    textAlignVertical: 'top',
-    color: COLORS.PRIMARY_TEXT,
-  },
-  submitButton: {
-    marginTop: 16,
-    backgroundColor: COLORS.ACCENT, 
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  submitText: {
-    color: COLORS.CARD_BACKGROUND,
+    fontSize: 18,
     fontWeight: '700',
-    fontSize: 16,
-  },
-  disabledButton: {
-    backgroundColor: '#CCCCCC',
-  },
-  reviewItem: {
-    paddingVertical: 12, 
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE', 
-  },
-  userHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    color: COLORS.PRIMARY_TEXT,
     marginBottom: 4,
   },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  menuPrice: {
+    fontSize: 16,
+    color: '#FF3B30',
+    fontWeight: '600',
+    marginBottom: 6,
   },
-  avatarImage: { // ⭐️ STYLE MỚI CHO AVATAR DÙNG URL ⭐️
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    marginRight: 8,
-    backgroundColor: COLORS.BORDER,
-  },
-  avatarText: {
-    color: COLORS.CARD_BACKGROUND, 
-    fontWeight: 'bold',
+  menuDesc: {
     fontSize: 14,
-  },
-  reviewUser: {
-    fontWeight: '700',
-    color: COLORS.PRIMARY_TEXT,
-    flexShrink: 1,
-  },
-  reviewRatingStars: { // Đổi tên style để tránh nhầm với renderRating
-    fontSize: 20,
-    marginBottom: 4,
-    marginLeft: 40, 
-  },
-  reviewComment: {
     color: COLORS.SECONDARY_TEXT,
-    marginLeft: 40, 
+    lineHeight: 20,
   },
-  noReviews: {
-    fontStyle: 'italic',
-    color: COLORS.SECONDARY_TEXT,
-    marginBottom: 10,
-  },
-  deleteButton: {
+    container: {
+      flex: 1,
+      backgroundColor: COLORS.CARD_BACKGROUND,
+    },
+    scrollContent: {
+      paddingBottom: 50, 
+    },
+    // ⭐️ STYLE ĐÃ SỬA: BACK BUTTON ⭐️
+    backButton: {
+      position: 'absolute',
+      top: 60, // Cố định vị trí
+      left: 15, 
+      borderRadius: 20,
       padding: 5,
-      marginLeft: 10,
-  }
+      zIndex: 100,
+    },
+    // ⭐️ STYLE ĐÃ SỬA: FAVORITE BUTTON ⭐️
+    favoriteButton: {
+      position: 'absolute', 
+      top: 60, // Cố định vị trí
+      right: 5, // Đặt ở góc phải
+      padding: 8,
+      borderRadius: 20,
+      zIndex: 100,
+    },
+    headerImage: { width: '100%', height: 220 },
+    content: {
+      padding: 16,
+      backgroundColor: COLORS.CARD_BACKGROUND,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      marginTop: -20,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-start', // Chỉ cần flex-start vì nút tim đã ở absolute
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    title: { fontSize: 24, fontWeight: '800', color: COLORS.PRIMARY_TEXT }, 
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 5,
+    },
+    ratingText: {},
+    sub: { 
+      color: COLORS.SECONDARY_TEXT, 
+      marginTop: 6,
+      marginLeft: 5, 
+    },
+    cta: {
+      marginTop: 16,
+      backgroundColor: COLORS.ACCENT,
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    ctaText: {
+      color: COLORS.CARD_BACKGROUND,
+      fontWeight: 'bold',
+      fontSize: 16,
+    },
+    menuSection: {
+      marginTop: 20,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.BORDER,
+    },
+    menuHeader: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: COLORS.PRIMARY_TEXT,
+      marginBottom: 10,
+    },
+    menuRow: {
+      justifyContent: 'space-between',
+    },
+    menuCard: {
+      width: '48%',
+      backgroundColor: '#F7F7F7',
+      borderRadius: 10,
+      marginBottom: 10,
+      alignItems: 'center',
+      paddingBottom: 10,
+      borderWidth: 1,
+      borderColor: COLORS.BORDER,
+    },
+    menuImage: {
+      width: '100%',
+      height: 100,
+      borderTopLeftRadius: 10,
+      borderTopRightRadius: 10,
+      marginBottom: 5,
+    },
+    menuFoodName: {
+      fontWeight: '600',
+      color: COLORS.PRIMARY_TEXT,
+    },
+    mapSection: {
+      marginTop: 20,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.BORDER,
+    },
+    mapHeader: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: COLORS.PRIMARY_TEXT,
+      marginBottom: 10,
+    },
+    map: {
+      width: '100%',
+      height: 300,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    reviewSection: {
+      marginTop: 20,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: COLORS.BORDER,
+    },
+    reviewHeader: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: COLORS.PRIMARY_TEXT,
+      marginBottom: 10,
+    },
+    ratingForm: {
+      marginBottom: 20,
+      padding: 10,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: COLORS.BORDER,
+      backgroundColor: '#F0F8FF',
+    },
+    formLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: COLORS.PRIMARY_TEXT,
+      marginTop: 10,
+      marginBottom: 5,
+    },
+    starContainer: {
+      flexDirection: 'row',
+      marginBottom: 10,
+    },
+    star: {
+      fontSize: 28,
+      marginRight: 5,
+    },
+    commentInput: {
+      height: 80,
+      borderColor: COLORS.BORDER,
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 10,
+      textAlignVertical: 'top',
+      color: COLORS.PRIMARY_TEXT,
+    },
+    submitButton: {
+      marginTop: 16,
+      backgroundColor: COLORS.ACCENT, 
+      padding: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    submitText: {
+      color: COLORS.CARD_BACKGROUND,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+    disabledButton: {
+      backgroundColor: '#CCCCCC',
+    },
+    reviewItem: {
+      paddingVertical: 12, 
+      borderBottomWidth: 1,
+      borderBottomColor: '#EEEEEE', 
+    },
+    userHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    avatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      marginRight: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarImage: { // ⭐️ STYLE MỚI CHO AVATAR DÙNG URL ⭐️
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      marginRight: 8,
+      backgroundColor: COLORS.BORDER,
+    },
+    avatarText: {
+      color: COLORS.CARD_BACKGROUND, 
+      fontWeight: 'bold',
+      fontSize: 14,
+    },
+    reviewUser: {
+      fontWeight: '700',
+      color: COLORS.PRIMARY_TEXT,
+      flexShrink: 1,
+    },
+    reviewRatingStars: { // Đổi tên style để tránh nhầm với renderRating
+      fontSize: 20,
+      marginBottom: 4,
+      marginLeft: 40, 
+    },
+    reviewComment: {
+      color: COLORS.SECONDARY_TEXT,
+      marginLeft: 40, 
+    },
+    noReviews: {
+      fontStyle: 'italic',
+      color: COLORS.SECONDARY_TEXT,
+      marginBottom: 10,
+    },
+    deleteButton: {
+        padding: 5,
+        marginLeft: 10,
+    }
 });

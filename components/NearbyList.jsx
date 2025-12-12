@@ -13,7 +13,7 @@ export default function NearbyList({ shownPlaces = [], onItemPress, hasMore = fa
       {shownPlaces.map((item, index) => (
         <Animated.View key={item.id || index} entering={FadeInUp.delay(index * 120).duration(600)}>
           <TouchableOpacity style={styles.card} onPress={() => onItemPress && onItemPress(item)}>
-            <Image source={require("../assets/amthuc.jpg")} style={styles.img} />
+            <Image source={{ uri: item.image || item.image_url || item.photo || item.photos?.[0] }} style={styles.img} />
             <View style={styles.info}>
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.details}>{item.address}</Text>
