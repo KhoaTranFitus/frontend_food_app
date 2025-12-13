@@ -21,7 +21,14 @@ export default function AllRestaurantsScreen({ navigation, route }) {
       onPress={() => navigation.navigate('RestaurantDetail', { item })}
     >
       <Image
-        source={{ uri: item.image || 'https://via.placeholder.com/100' }}
+        source={{
+          uri:
+            item.image ||
+            item.image_url ||
+            item.photo ||
+            item.thumbnail ||
+            'https://picsum.photos/200',
+        }}
         style={styles.restaurantImg}
       />
       <View style={styles.restaurantInfo}>

@@ -6,8 +6,7 @@ import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.1.22:5000/api'; 
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.0.101:5000/api'; 
 
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
@@ -391,7 +390,7 @@ export const foodAPI = {
       const response = await apiClient.get('/foods', {
         params: { limit },
       });
-      return response.data.foods || [];
+      return response.data || [];
     } catch (error) {
       console.error('Get foods error:', error);
       throw error.response?.data || { error: error.message };
@@ -415,7 +414,7 @@ export const foodAPI = {
       const response = await apiClient.get('/foods/search', {
         params: { q: query },
       });
-      return response.data.foods || [];
+      return response.data || [];
     } catch (error) {
       console.error('Search foods error:', error);
       throw error.response?.data || { error: error.message };
@@ -426,7 +425,7 @@ export const foodAPI = {
   getByCategory: async (categoryId) => {
     try {
       const response = await apiClient.get(`/foods/category/${categoryId}`);
-      return response.data.foods || [];
+      return response.data || [];
     } catch (error) {
       console.error('Get foods by category error:', error);
       throw error.response?.data || { error: error.message };
@@ -437,7 +436,7 @@ export const foodAPI = {
   getByRestaurant: async (restaurantId) => {
     try {
       const response = await apiClient.get(`/foods/restaurant/${restaurantId}`);
-      return response.data.foods || [];
+      return response.data || [];
     } catch (error) {
       console.error('Get foods by restaurant error:', error);
       throw error.response?.data || { error: error.message };
