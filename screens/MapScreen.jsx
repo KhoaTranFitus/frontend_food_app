@@ -506,7 +506,7 @@ export default function MapScreen({ navigation, route }) {
 
       {loadingRestaurants && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#2196F3" />
+          <ActivityIndicator size="large" color="#d00f1cff" />
           <Text style={styles.loadingText}>Đang tải nhà hàng...</Text>
         </View>
       )}

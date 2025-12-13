@@ -146,8 +146,8 @@ const styles = StyleSheet.create({
     height: 100,
     zIndex: 10
   },
-  welcomeText: { fontSize: 28, fontWeight: "700", color: "#07212A" }, // Giảm size chút cho cân đối
-  subText: { color: "#08404A", marginTop: 4, fontSize: 14 },
+  welcomeText: { fontSize: 28, fontWeight: "700", color: "#ffffffff" }, // Giảm size chút cho cân đối
+  subText: { color: "#ffffffff", marginTop: 4, fontSize: 14 },
   rightButtons: { flexDirection: "row", alignItems: "center" },
 
   circleButton: {
