@@ -2,7 +2,17 @@ import React from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import Animated, { FadeInUp } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
+import restaurants from "../data/restaurants.json";
 
+const findImageFromRestaurants = (place) => {
+  if (!place?.name) return null;
+
+  const matched = restaurants.find(
+    r => r.name?.toLowerCase() === place.name.toLowerCase()
+  );
+
+  return matched?.image_url || null;
+};
 export default function NearbyList({ shownPlaces = [], onItemPress, hasMore = false, onViewMore }) {
   if (!shownPlaces || shownPlaces.length === 0) {
     return <Text style={{ textAlign: "center", color: "gray", marginVertical: 10 }}>Không tìm thấy quán ăn gần bạn.</Text>;
@@ -10,17 +20,37 @@ export default function NearbyList({ shownPlaces = [], onItemPress, hasMore = fa
 
   return (
     <View>
-      {shownPlaces.map((item, index) => (
-        <Animated.View key={item.id || index} entering={FadeInUp.delay(index * 120).duration(600)}>
-          <TouchableOpacity style={styles.card} onPress={() => onItemPress && onItemPress(item)}>
-            <Image source={{ uri: item.image || item.image_url || item.photo || item.photos?.[0] }} style={styles.img} />
-            <View style={styles.info}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.details}>{item.address}</Text>
-            </View>
-          </TouchableOpacity>
-        </Animated.View>
-      ))}
+      {shownPlaces.map((item, index) => {
+        const imageUri = findImageFromRestaurants(item);
+        const itemWithImage = {
+          ...item,
+          image_url: imageUri,
+        };
+        return (
+          <Animated.View
+            key={item.id || index}
+            entering={FadeInUp.delay(index * 120).duration(600)}
+          >
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => onItemPress(itemWithImage)}
+            >
+              {imageUri && (
+                <Image
+                  source={{ uri: imageUri }}
+                  style={styles.img}
+                />
+              )}
+
+              <View style={styles.info}>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.details}>{item.address}</Text>
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
+        );
+      })}
+
       {hasMore && onViewMore && (
         <TouchableOpacity style={styles.viewMoreButton} onPress={onViewMore}>
           <Text style={styles.viewMoreText}>Xem thêm</Text>

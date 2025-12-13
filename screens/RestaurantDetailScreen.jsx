@@ -11,6 +11,8 @@ import { foodAPI, favoriteAPI, reviewAPI } from '../services/flaskApi';
 
 
 
+
+
 // ⭐️ ĐỊNH NGHĨA MÀU SẮC (Đồng bộ) ⭐️
 const COLORS = {
   BACKGROUND: '#9a0e0eff',      // Màu nền đỏ sẫm (giống Home Header)
@@ -443,8 +445,12 @@ export default function RestaurantDetailScreen({ route, navigation }) {
         />
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
-            <Image source={{ uri: item.image || item.image_url || item.photo || item.photos?.[0] }} style={styles.headerImage} />
-
+            {item.image_url && (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.headerImage}
+              />
+            )}
             <View style={styles.content}>
                 <View style={styles.titleRow}>
                     <Text style={styles.title}>{item?.name || 'Tên Nhà Hàng'}</Text>

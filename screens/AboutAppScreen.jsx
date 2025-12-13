@@ -10,13 +10,13 @@ export default function AboutAppScreen() {
 
   // Danh sách 7 thành viên nhóm
   const members = [
-    "Trần Đình Khoa",
-    "Trần Nhật Đăng",
-    "Thạch Cao Phong",
-    "Đoàn Minh Triết",
-    "Nguyễn Trung Hiếu",
-    "Lương Minh Khôi",
-    "Lại Minh Thông",
+    { name: "Trần Đình Khoa", mssv: "24127426" },
+    { name: "Lương Minh Khôi", mssv: "24127064" },
+    { name: "Thạch Cao Phong", mssv: "24127101" },
+    { name: "Nguyễn Trung Hiếu", mssv: "24127370" },
+    { name: "Trần Nhật Đăng", mssv: "24127339" },
+    { name: "Lại Minh Thông", mssv: "24127127" },
+    { name: "Đoàn Minh Triết", mssv: "24127571" },
   ];
 
   return (
@@ -47,12 +47,15 @@ export default function AboutAppScreen() {
         {/* TEAM SECTION */}
         <Text style={styles.sectionTitle}>Our Team</Text>
 
-        {members.map((name, index) => (
+        {members.map((member, index) => (
           <View key={index} style={styles.memberCard}>
-            <Text style={styles.memberName}>{name}</Text>
-            <Text style={styles.memberPlaceholder}>Vai trò: (Chờ nhóm trưởng bổ sung)</Text>
+            <Text style={styles.memberName}>{member.name}</Text>
+            <Text style={styles.memberPlaceholder}>
+              MSSV: {member.mssv}
+            </Text>
           </View>
         ))}
+
 
         <View style={{ height: 40 }} />
       </ScrollView>
