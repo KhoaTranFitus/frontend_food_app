@@ -369,11 +369,9 @@ const styles = StyleSheet.create({
   },
   exploreBtn: {
     position: "absolute",
-    left: 20,
-    right: 20,
     backgroundColor: COLORS.ACCENT,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 14,   //Chỉnh chữ khám phá
     alignItems: "center",
     elevation: 5,
     shadowColor: COLORS.ACCENT,
