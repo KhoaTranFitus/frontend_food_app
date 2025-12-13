@@ -56,8 +56,10 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401) {
-      await AsyncStorage.removeItem('authToken');
-      Alert.alert("Phiên hết hạn", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      // TODO: Backend có bug validate token. Tạm thời comment out để tránh xóa token khi gặp 401 sai
+      // await AsyncStorage.removeItem('authToken');
+      // Alert.alert("Phiên hết hạn", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      console.warn('⚠️ Got 401 but keeping token (backend validation bug)');
     }
 
     if (!error.response) {
@@ -653,6 +655,31 @@ export const chatbotAPI = {
       return response.data;
     } catch (error) {
       console.error('Chatbot search error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // GET /api/chatbot/favorites-for-route - Lấy danh sách yêu thích cho route planner
+  getFavoritesForRoute: async () => {
+    try {
+      const response = await apiClient.get('/chatbot/favorites-for-route');
+      return response.data;
+    } catch (error) {
+      console.error('Get favorites for route error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // POST /api/chatbot/create-route - Tạo lộ trình từ các quán đã chọn
+  createRoute: async (restaurantIds, userLocation = null) => {
+    try {
+      const response = await apiClient.post('/chatbot/create-route', {
+        restaurant_ids: restaurantIds,
+        user_location: userLocation,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Create route error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
