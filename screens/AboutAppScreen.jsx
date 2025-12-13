@@ -10,13 +10,13 @@ export default function AboutAppScreen() {
 
   // Danh sách 7 thành viên nhóm
   const members = [
-    { name: "Trần Đình Khoa", mssv: "24127426" },
-    { name: "Lương Minh Khôi", mssv: "24127064" },
-    { name: "Thạch Cao Phong", mssv: "24127101" },
-    { name: "Nguyễn Trung Hiếu", mssv: "24127370" },
-    { name: "Trần Nhật Đăng", mssv: "24127339" },
-    { name: "Lại Minh Thông", mssv: "24127127" },
-    { name: "Đoàn Minh Triết", mssv: "24127571" },
+    { name: "Trần Đình Khoa"  },
+    { name: "Lương Minh Khôi" },
+    { name: "Thạch Cao Phong" },
+    { name: "Nguyễn Trung Hiếu" },
+    { name: "Trần Nhật Đăng"  },
+    { name: "Lại Minh Thông" },
+    { name: "Đoàn Minh Triết" },
   ];
 
   const id = [
@@ -59,7 +59,7 @@ export default function AboutAppScreen() {
 
         {members.map((member, index) => (
           <View key={index} style={styles.memberCard}>
-            <Text style={styles.memberName}>{name}</Text>
+            <Text style={styles.memberName}>{member.name}</Text>
             <Text style={styles.memberPlaceholder}>MSSV: {id[index]}</Text>
           </View>
         ))}
