@@ -66,7 +66,11 @@ export default function ProfileScreen() {
                 {/* INFO CARD */}
                 <View style={styles.card}>
                     <Image
-                        source={{ uri: profile.avatar_url || 'https://via.placeholder.com/150' }}
+                        source={
+                            (profile.avatar_url && profile.avatar_url !== "")
+                                ? { uri: profile.avatar_url }
+                                : require("../assets/default_avatar.jpg") // <-- Thay tên file ảnh mặc định của bạn vào đây
+                        }
                         style={styles.avatar}
                     />
                     <Text style={styles.name}>{profile.name}</Text>
