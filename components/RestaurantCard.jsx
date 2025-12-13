@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableWithoutFeedback } from 'react-native';
-import { MotiView, MotiImage } from 'moti';
+import { MotiView } from 'moti';
+import { Image } from 'react-native';
+
 
 export default function RestaurantCard({ item, index }) {
   return (
@@ -20,13 +22,18 @@ export default function RestaurantCard({ item, index }) {
           whileTap={{ scale: 0.95 }} // nhún nhẹ khi bấm
           style={styles.card}
         >
-          <MotiImage
-            source={{ uri: item.image || item.image_url || item.photo || item.photos?.[0] }}
-            style={styles.img}
-            from={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'timing', duration: 500 }}
-          />
+          <MotiView
+          from={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'timing', duration: 500 }}
+        >
+          {item.image_url && (
+            <Image
+              source={{ uri: item.image_url }}
+              style={styles.img}
+            />
+          )}
+        </MotiView>
           <View style={{ padding: 8 }}>
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.meta}>{item.rating} ⭐  •  {item.price}</Text>
