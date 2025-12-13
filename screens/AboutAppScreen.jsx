@@ -19,6 +19,16 @@ export default function AboutAppScreen() {
     "Lại Minh Thông",
   ];
 
+  const id = [
+    "24127426",
+    "24127339",
+    "24127101",
+    "24127571",
+    "24127370",
+    "24127064",
+    "24127127"
+  ]
+
   return (
     <View style={styles.container}>
       
@@ -40,7 +50,7 @@ export default function AboutAppScreen() {
         <View style={styles.appInfo}>
           <Text style={styles.appName}>Food App</Text>
           <Text style={styles.appDesc}>
-            Ứng dụng tìm kiếm món ăn và nhà hàng — được phát triển bởi nhóm sinh viên IT.
+            Ứng dụng tìm kiếm món ăn và nhà hàng — được phát triển bởi nhóm QuocKang say Hi.
           </Text>
         </View>
 
@@ -50,7 +60,7 @@ export default function AboutAppScreen() {
         {members.map((name, index) => (
           <View key={index} style={styles.memberCard}>
             <Text style={styles.memberName}>{name}</Text>
-            <Text style={styles.memberPlaceholder}>Vai trò: (Chờ nhóm trưởng bổ sung)</Text>
+            <Text style={styles.memberPlaceholder}>MSSV: {id[index]}</Text>
           </View>
         ))}
 
@@ -83,7 +93,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#000",
+    color: "#ffffffff",
   },
 
   appInfo: {
@@ -94,13 +104,13 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#000",
+    color: "#ffffffff",
   },
   appDesc: {
     textAlign: "center",
     marginTop: 8,
-    fontSize: 16,
-    color: "#333",
+    fontSize: 17,
+    color: "#ffffffff",
     paddingHorizontal: 20,
   },
 
@@ -109,7 +119,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 20,
     marginBottom: 10,
-    color: "#000",
+    color: "#ffffffff",
   },
 
   memberCard: {

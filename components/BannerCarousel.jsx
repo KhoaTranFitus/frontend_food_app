@@ -16,6 +16,7 @@ export default function BannerCarousel({
     require("../assets/banner1.jpg"),
     require("../assets/banner2.jpg"),
     require("../assets/banner3.jpg"),
+    require("../assets/banner4.jpg"),
   ],
   autoPlayInterval = 3000,
   height = 180,

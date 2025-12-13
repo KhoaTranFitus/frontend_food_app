@@ -124,10 +124,10 @@ export default function HomeScreen({ navigation, route }) {
   const [searchMode, setSearchMode] = useState("nearby");
   const categories = [
     { name: "Món mặn", icon: require("../assets/beef.jpg") },
-    { name: "Món nước", icon: require("../assets/burger.png") },
-    { name: "Món chay", icon: require("../assets/comtam.jpg") },
+    { name: "Món nước", icon: require("../assets/monnuoc.png") },
+    { name: "Món chay", icon: require("../assets/dochay.jpg") },
     { name: "Tráng miệng", icon: require("../assets/coffee.jpg") },
-    { name: "Đặc sản", icon: require("../assets/drink.png") },
+    { name: "Đặc sản", icon: require("../assets/dacsan.png") },
     { name: "Ăn nhẹ", icon: require("../assets/pizza.png") },
     { name: "xem thêm..." },
   ];
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 12,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "700" },
+  sectionTitle: { fontSize: 18, color: "#ffffffff", fontWeight: "700" },
   seeAll: { fontSize: 14, color: "#ff6347" },
 });
 

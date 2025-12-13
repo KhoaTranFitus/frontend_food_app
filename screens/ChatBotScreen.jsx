@@ -1,10 +1,62 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, Image, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, Image, Alert, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { chatbotAPI } from '../services/flaskApi';
 import RoutePlannerModal from '../components/RoutePlannerModal';
+
+// Component typing indicator với animation
+const TypingIndicator = () => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateDot = (dot, delay) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: -8,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const animation1 = animateDot(dot1, 0);
+    const animation2 = animateDot(dot2, 150);
+    const animation3 = animateDot(dot3, 300);
+
+    animation1.start();
+    animation2.start();
+    animation3.start();
+
+    return () => {
+      animation1.stop();
+      animation2.stop();
+      animation3.stop();
+    };
+  }, []);
+
+  return (
+    <View style={styles.typingIndicatorContainer}>
+      <Text style={styles.typingText}>Chat Food đang suy nghĩ</Text>
+      <View style={styles.dotsContainer}>
+        <Animated.View style={[styles.dot, { transform: [{ translateY: dot1 }] }]} />
+        <Animated.View style={[styles.dot, { transform: [{ translateY: dot2 }] }]} />
+        <Animated.View style={[styles.dot, { transform: [{ translateY: dot3 }] }]} />
+      </View>
+    </View>
+  );
+};
 
 export default function ChatBotScreen() {
   const navigation = useNavigation();
@@ -61,7 +113,7 @@ export default function ChatBotScreen() {
     // Thêm loading message
     const loadingMessage = {
       id: Date.now(),
-      text: '🔍 Chat Food đang tìm kiếm cho bạn...',
+      text: '', // Không cần text vì sẽ hiển thị TypingIndicator
       isBot: true,
       isLoading: true,
     };
@@ -120,9 +172,13 @@ export default function ChatBotScreen() {
         </View>
       )}
       <View style={[styles.messageBubble, item.isBot ? styles.botBubble : styles.userBubble]}>
-        <Text style={[styles.messageText, item.isBot ? styles.botText : styles.userText]}>
-          {item.text}
-        </Text>
+        {item.isLoading ? (
+          <TypingIndicator />
+        ) : (
+          <Text style={[styles.messageText, item.isBot ? styles.botText : styles.userText]}>
+            {item.text}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -158,7 +214,7 @@ export default function ChatBotScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>🤖🧠🇦🇮👾 Food App AI</Text>
+          <Text style={styles.headerTitle}>🤖 Food AI</Text>
           <Text style={styles.headerSubtitle}>Trợ lý ẩm thực của bạn</Text>
         </View>
         <View style={styles.headerRight}>
@@ -247,7 +303,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f8f8',
   },
   header: {
-    backgroundColor: '#ff6347',
+    backgroundColor: '#b7161bff',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomLeftRadius: 16,
@@ -417,5 +473,25 @@ const styles = StyleSheet.create({
   },
   stopButtonStyle: {
     backgroundColor: '#dc3545',
+  },
+  typingIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  typingText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ff6347',
   },
 });
