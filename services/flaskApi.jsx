@@ -20,6 +20,7 @@ const apiClient = axios.create({
   timeout: 120000, // 120s cho ngrok tunnel (map/routing cần nhiều thời gian)
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 

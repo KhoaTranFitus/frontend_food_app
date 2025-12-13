@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useContext } from "react"; // 1. Thêm useContext
 import {
-    View, Text, Image, TouchableOpacity, StyleSheet, ScrollView
+    View, Text, Image, TouchableOpacity, StyleSheet, ScrollView, Modal
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
@@ -18,6 +18,7 @@ export default function ProfileScreen() {
         email: '...',
         avatar_url: null
     });
+    const [showSettings, setShowSettings] = useState(false);
 
     // Load lại dữ liệu mỗi khi màn hình được hiển thị
     useFocusEffect(
@@ -56,8 +57,8 @@ export default function ProfileScreen() {
                     <Ionicons name="arrow-back-outline" size={24} color="white" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Hồ sơ cá nhân</Text>
-                <TouchableOpacity>
-                    <Ionicons name="settings-outline" size={24} color="white" />
+                <TouchableOpacity onPress={() => setShowSettings(true)}>
+                  <Ionicons name="settings-outline" size={24} color="white" />
                 </TouchableOpacity>
             </View>
 
@@ -102,6 +103,46 @@ export default function ProfileScreen() {
 
                 </View>
             </ScrollView>
+            {/* SETTINGS POPUP */}
+            <Modal
+            visible={showSettings}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowSettings(false)}
+            >
+            <TouchableOpacity
+                style={styles.overlay}
+                activeOpacity={1}
+                onPress={() => setShowSettings(false)}
+            >
+                <View style={styles.settingsPopup}>
+
+                <Text style={styles.popupTitle}>Settings</Text>
+
+                {/* ABOUT APP */}
+                <PopupItem
+                    icon="information-circle-outline"
+                    title="About App"
+                    onPress={() => {
+                    setShowSettings(false);
+                    navigation.navigate("AboutApp");
+                    }}
+                />
+
+                {/* NOTIFICATIONS */}
+                <PopupItem
+                    icon="notifications-outline"
+                    title="Notifications"
+                    onPress={() => {
+                    setShowSettings(false);
+                    navigation.navigate("Notifications");
+                    }}
+                />
+
+                </View>
+            </TouchableOpacity>
+            </Modal>
+
         </SafeAreaView>
     );
 }
@@ -116,6 +157,16 @@ const OptionItem = ({ icon, title, onPress }) => (
         <Ionicons name="chevron-forward" size={20} color="#ccc" />
     </TouchableOpacity>
 );
+const PopupItem = ({ icon, title, onPress }) => (
+  <TouchableOpacity style={styles.popupItem} onPress={onPress}>
+    <View style={styles.row}>
+      <Ionicons name={icon} size={20} color="#333" />
+      <Text style={styles.popupText}>{title}</Text>
+    </View>
+    <Ionicons name="chevron-forward" size={18} color="#aaa" />
+  </TouchableOpacity>
+);
+
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#9a0e0e" },
@@ -144,5 +195,43 @@ const styles = StyleSheet.create({
         paddingVertical: 15, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: '#f0f0f0'
     },
     row: { flexDirection: 'row', alignItems: 'center' },
-    optionText: { marginLeft: 15, fontSize: 16, fontWeight: '500' }
+    optionText: { marginLeft: 15, fontSize: 16, fontWeight: '500' },
+    
+    overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center"
+    },
+
+    settingsPopup: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    elevation: 10
+    },
+
+    popupTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center"
+    },
+
+    popupItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0"
+    },
+
+    popupText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: "#333"
+    },
+
 });
