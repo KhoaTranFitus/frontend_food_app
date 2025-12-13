@@ -10,43 +10,69 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import restaurants from '../data/restaurants.json';
+
 
 export default function AllRestaurantsScreen({ navigation, route }) {
   const { places, userLoc } = route.params || { places: [], userLoc: null };
   const [loading, setLoading] = useState(false);
+  const findImageFromRestaurants = (place) => {
+    if (!place?.name) return null;
 
-  const renderRestaurantItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.restaurantCard}
-      onPress={() => navigation.navigate('RestaurantDetail', { item })}
-    >
-      <Image
-        source={{
-          uri:
-            item.image ||
-            item.image_url ||
-            item.photo ||
-            item.thumbnail ||
-            'https://picsum.photos/200',
-        }}
-        style={styles.restaurantImg}
-      />
-      <View style={styles.restaurantInfo}>
-        <Text style={styles.restaurantName} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={styles.restaurantDetails} numberOfLines={2}>
-          {item.address}
-        </Text>
-        {item.rating && (
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={14} color="#FFB800" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
-          </View>
+    const placeName = place.name.toLowerCase();
+
+    const found = restaurants.find(r => {
+      const rName = r.name.toLowerCase();
+      return (
+        rName.includes(placeName) ||
+        placeName.includes(rName)
+      );
+    });
+
+    return found?.image_url || null;
+  };
+
+  const renderRestaurantItem = ({ item }) => {
+    const imageUri = findImageFromRestaurants(item);
+    const itemWithImage = {
+      ...item,
+      image_url: imageUri,
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.restaurantCard}
+        onPress={() =>
+          navigation.navigate('RestaurantDetail', {
+            item: itemWithImage,
+          })
+        }
+      >
+        {imageUri && (
+          <Image
+            source={{ uri: imageUri }}
+            style={styles.restaurantImg}
+          />
         )}
-      </View>
-    </TouchableOpacity>
-  );
+
+        <View style={styles.restaurantInfo}>
+          <Text style={styles.restaurantName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text style={styles.restaurantDetails} numberOfLines={2}>
+            {item.address}
+          </Text>
+
+          {item.rating && (
+            <View style={styles.ratingRow}>
+              <Ionicons name="star" size={14} color="#FFB800" />
+              <Text style={styles.ratingText}>{item.rating}</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
