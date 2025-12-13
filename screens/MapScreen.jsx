@@ -13,6 +13,10 @@ export default function MapScreen({ navigation, route }) {
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
 
+  // ===== ROUTE PLANNER STATE =====
+  const [routePlan, setRoutePlan] = useState(null); // Data from Route Planner
+  const [routePlanMarkers, setRoutePlanMarkers] = useState([]); // Optimized route markers
+
   // ===== BACKEND DATA STATE =====
   const [restaurants, setRestaurants] = useState([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(false);
@@ -205,6 +209,128 @@ export default function MapScreen({ navigation, route }) {
     }
   }, [route.params?.destination, userLocation, navigation]);
 
+  // ===== LISTEN FOR ROUTE PLAN FROM CHAT ROUTE PLANNER =====
+  /**
+   * When user creates route plan from ChatScreen,
+   * route.params contains routePlan with optimized route data
+   */
+  useEffect(() => {
+    console.log('🔍 MapScreen useEffect - route.params:', route.params);
+    
+    if (route.params?.routePlan) {
+      console.log('🗺️ Received route plan from Chat:', JSON.stringify(route.params.routePlan, null, 2));
+      const plan = route.params.routePlan;
+      
+      // Check if route has valid data
+      if (!plan.route || plan.route.length === 0) {
+        Alert.alert('Lỗi', 'Lộ trình không có dữ liệu');
+        return;
+      }
+      
+      console.log(`📊 Processing ${plan.route.length} stops...`);
+      setRoutePlan(plan);
+      
+      // Backend returns: { id, latitude, longitude, ... } NOT { coordinates: {lat, lon} }
+      const markers = plan.route.map((stop, index) => {
+        const lat = stop.latitude || stop.coordinates?.lat;
+        const lon = stop.longitude || stop.coordinates?.lon;
+        
+        console.log(`Stop ${index + 1}: ${stop.name} - lat: ${lat}, lon: ${lon}`);
+        
+        if (!lat || !lon) {
+          console.warn(`⚠️ Stop ${stop.name} has null coordinates:`, stop);
+        }
+        
+        return {
+          id: stop.id || stop.restaurant_id,
+          name: stop.name,
+          latitude: lat,
+          longitude: lon,
+          order: stop.order || index + 1,
+          distance: stop.distance_from_previous || 0,
+        };
+      });
+      
+      // Filter out markers with null coordinates
+      const validMarkers = markers.filter(m => m.latitude && m.longitude);
+      
+      console.log(`✅ Valid markers: ${validMarkers.length}/${markers.length}`);
+      
+      if (validMarkers.length === 0) {
+        Alert.alert(
+          'Lỗi Tọa Độ',
+          'Backend không trả về tọa độ hợp lệ cho các quán.\n\nCần fix backend để lấy lat/lon từ database.'
+        );
+        return;
+      }
+      
+      setRoutePlanMarkers(validMarkers);
+
+      // ✅ Use route_coordinates from backend if available
+      if (plan.route_coordinates && plan.route_coordinates.length > 0) {
+        console.log(`🗺️ Received route_coordinates from backend (length: ${plan.route_coordinates.length})`);
+        
+        // Check if it's nested array (array of segments) or flat array
+        let routeCoordinates = plan.route_coordinates;
+        
+        // If first element is an array, it's nested - need to flatten
+        if (Array.isArray(routeCoordinates[0])) {
+          console.log('⚠️ Detected nested array, flattening...');
+          routeCoordinates = routeCoordinates.flat();
+          console.log(`✅ Flattened to ${routeCoordinates.length} points`);
+        }
+        
+        // Ensure format is {latitude, longitude}
+        const formattedCoords = routeCoordinates.map(coord => {
+          if (coord.latitude && coord.longitude) {
+            return coord; // Already correct format
+          } else if (coord.lat && coord.lon) {
+            return { latitude: coord.lat, longitude: coord.lon }; // Convert from lat/lon
+          }
+          return coord;
+        });
+        
+        console.log('🔍 First 3 coords:', JSON.stringify(formattedCoords.slice(0, 3)));
+        console.log('🔍 Last 3 coords:', JSON.stringify(formattedCoords.slice(-3)));
+        console.log(`📏 Total route points: ${formattedCoords.length}`);
+        
+        setRouteCoords(formattedCoords);
+
+        // Fit map to show entire route
+        if (mapRef.current) {
+          setTimeout(() => {
+            if (mapRef.current) {
+              mapRef.current.fitToCoordinates(plan.route_coordinates, {
+                edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
+                animated: true,
+              });
+            }
+          }, 500);
+        }
+      } else {
+        console.warn('⚠️ No route_coordinates from backend, displaying markers only');
+        // Fallback: just fit to markers
+        if (mapRef.current && validMarkers.length > 0) {
+          const markerCoords = validMarkers.map(m => ({
+            latitude: m.latitude,
+            longitude: m.longitude,
+          }));
+          setTimeout(() => {
+            if (mapRef.current) {
+              mapRef.current.fitToCoordinates(markerCoords, {
+                edgePadding: { top: 100, right: 50, bottom: 100, left: 50 },
+                animated: true,
+              });
+            }
+          }, 500);
+        }
+      }
+
+      // Clear params
+      navigation.setParams({ routePlan: undefined });
+    }
+  }, [route.params?.routePlan, navigation]);
+
   // ===== AUTO-FETCH ROUTE WHEN DESTINATION CHANGES =====
   /**
    * When destination state updates, automatically call backend to get route
@@ -270,6 +396,8 @@ export default function MapScreen({ navigation, route }) {
     console.log('🛑 Canceling navigation');
     setRouteCoords([]);
     setDestination(null);
+    setRoutePlan(null);
+    setRoutePlanMarkers([]);
   };
 
   // Navigate to restaurant detail screen
@@ -299,35 +427,75 @@ export default function MapScreen({ navigation, route }) {
           initialRegion={userLocation}
           showsUserLocation={true}
         >
-          <Marker coordinate={userLocation} title="Vị trí của bạn" />
           {destination && <Marker coordinate={destination} title="Điểm đến" pinColor="red" />}
 
-          {/* Display filtered restaurants from backend */}
-          {restaurants && restaurants.length > 0 && restaurants.map(restaurant => (
-            <Marker
-              key={restaurant.id}
-              coordinate={{
-                latitude: restaurant.position.lat,
-                longitude: restaurant.position.lon,
-              }}
-              title={restaurant.name}
-              description={restaurant.address}
-              pinColor={restaurant.pinColor}
-            >
-              <Callout onPress={() => handleRestaurantPress(restaurant)} tooltip={true}>
-                <View style={styles.calloutContainer}>
-                  <Text style={styles.calloutTitle}>{restaurant.name}</Text>
-                  <Text style={styles.calloutAddress}>{restaurant.address}</Text>
-                  {restaurant.distance && <Text style={styles.calloutDistance}>Khoảng cách: {restaurant.distance} km</Text>}
-                  {restaurant.rating && <Text style={styles.calloutRating}>Rating: {restaurant.rating} ⭐</Text>}
-                  <Text style={styles.calloutTapHint}>Nhấn để xem chi tiết</Text>
+          {/* Display Route Planner markers with numbered pins */}
+          {routePlanMarkers && routePlanMarkers.length > 0 ? (
+            routePlanMarkers.map((marker) => (
+              <Marker
+                key={marker.id}
+                coordinate={{
+                  latitude: marker.latitude,
+                  longitude: marker.longitude,
+                }}
+                pinColor="#FF6347"
+              >
+                <View style={{ alignItems: 'center' }}>
+                  <View style={styles.markerLabelContainer}>
+                    <Text style={styles.markerLabelText}>{marker.order}. {marker.name}</Text>
+                  </View>
+                  <View style={styles.routeMarker}>
+                    <Text style={styles.routeMarkerText}>{marker.order}</Text>
+                  </View>
                 </View>
-              </Callout>
-            </Marker>
-          ))}
+                <Callout tooltip={true}>
+                  <View style={styles.calloutContainer}>
+                    <Text style={styles.calloutTitle}>
+                      {marker.order}. {marker.name}
+                    </Text>
+                    {marker.distance && (
+                      <Text style={styles.calloutDistance}>
+                        Khoảng cách: {marker.distance.toFixed(2)} km
+                      </Text>
+                    )}
+                  </View>
+                </Callout>
+              </Marker>
+            ))
+          ) : (
+            restaurants && restaurants.length > 0 && restaurants.map(restaurant => (
+              <Marker
+                key={restaurant.id}
+                coordinate={{
+                  latitude: restaurant.position.lat,
+                  longitude: restaurant.position.lon,
+                }}
+                title={restaurant.name}
+                description={restaurant.address}
+                pinColor={restaurant.pinColor}
+              >
+                <Callout onPress={() => handleRestaurantPress(restaurant)} tooltip={true}>
+                  <View style={styles.calloutContainer}>
+                    <Text style={styles.calloutTitle}>{restaurant.name}</Text>
+                    <Text style={styles.calloutAddress}>{restaurant.address}</Text>
+                    {restaurant.distance && <Text style={styles.calloutDistance}>Khoảng cách: {restaurant.distance} km</Text>}
+                    {restaurant.rating && <Text style={styles.calloutRating}>Rating: {restaurant.rating} ⭐</Text>}
+                    <Text style={styles.calloutTapHint}>Nhấn để xem chi tiết</Text>
+                  </View>
+                </Callout>
+              </Marker>
+            ))
+          )}
 
+          {/* Polyline connecting all route stops */}
           {routeCoords.length > 0 && (
-            <Polyline coordinates={routeCoords} strokeWidth={4} strokeColor="blue" />
+            <Polyline 
+              coordinates={routeCoords} 
+              strokeWidth={5} 
+              strokeColor="#FF6347"
+              lineCap="round"
+              lineJoin="round"
+            />
           )}
         </MapView>
       ) : (
@@ -344,13 +512,34 @@ export default function MapScreen({ navigation, route }) {
       )}
 
       {/* Cancel Navigation Button - appears when route is active */}
-      {routeCoords.length > 0 && (
+      {routeCoords.length > 0 && !routePlan && (
         <TouchableOpacity 
           style={styles.cancelNavButton} 
           onPress={cancelNavigation}
         >
           <Text style={styles.cancelNavButtonText}>✕ Hủy Chỉ Đường</Text>
         </TouchableOpacity>
+      )}
+
+      {/* Route Info Panel - shows route plan statistics */}
+      {routePlan && (
+        <View style={styles.routeInfoPanel}>
+          <Text style={styles.routeInfoTitle}>📍 Lộ trình tối ưu</Text>
+          <Text style={styles.routeInfoText}>
+            Số điểm: {routePlan.route.length} quán
+          </Text>
+          {routePlan.total_distance_km !== undefined && (
+            <Text style={styles.routeInfoText}>
+              Tổng khoảng cách: {routePlan.total_distance_km.toFixed(2)} km
+            </Text>
+          )}
+          <TouchableOpacity 
+            style={[styles.cancelNavButton, { position: 'relative', marginTop: 12, alignSelf: 'center' }]} 
+            onPress={cancelNavigation}
+          >
+            <Text style={styles.cancelNavButtonText}>✕ Hủy Lộ Trình</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Hamburger menu, giờ nằm dưới search bar và align trái với searchContainer */}
@@ -561,5 +750,71 @@ export default function MapScreen({ navigation, route }) {
      fontSize: 14,
      fontWeight: '700',
      textAlign: 'center',
+   },
+   routeMarker: {
+     width: 36,
+     height: 36,
+     borderRadius: 18,
+     backgroundColor: '#FF6347',
+     justifyContent: 'center',
+     alignItems: 'center',
+     borderWidth: 3,
+     borderColor: '#fff',
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.3,
+     shadowRadius: 3,
+     elevation: 5,
+   },
+   routeMarkerText: {
+     color: '#fff',
+     fontSize: 16,
+     fontWeight: '700',
+   },
+   markerLabelContainer: {
+     backgroundColor: 'rgba(255, 255, 255, 0.95)',
+     paddingHorizontal: 8,
+     paddingVertical: 4,
+     borderRadius: 6,
+     marginBottom: 4,
+     borderWidth: 1,
+     borderColor: '#FF6347',
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 1 },
+     shadowOpacity: 0.2,
+     shadowRadius: 2,
+     elevation: 3,
+   },
+   markerLabelText: {
+     color: '#FF6347',
+     fontSize: 12,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
+   routeInfoPanel: {
+     position: 'absolute',
+     bottom: 20,
+     left: 20,
+     right: 20,
+     backgroundColor: '#fff',
+     borderRadius: 12,
+     padding: 16,
+     elevation: 5,
+     zIndex: 50,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.2,
+     shadowRadius: 4,
+   },
+   routeInfoTitle: {
+     fontSize: 16,
+     fontWeight: '700',
+     color: '#333',
+     marginBottom: 8,
+   },
+   routeInfoText: {
+     fontSize: 13,
+     color: '#666',
+     marginBottom: 4,
    },
  });

@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, FlatList, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { chatbotAPI } from '../services/flaskApi';
+import RoutePlannerModal from '../components/RoutePlannerModal';
 
 export default function ChatBotScreen() {
+  const navigation = useNavigation();
   const [messages, setMessages] = useState([
     { id: 1, text: 'Chào bro! 👨‍🍳 Tôi là Food App AI, sẵn sàng giúp bro tìm nhà hàng tuyệt vời hoặc gợi ý các món ăn ngon!', isBot: true },
   ]);
@@ -12,6 +15,7 @@ export default function ChatBotScreen() {
   const [conversationId, setConversationId] = useState(null); // Lưu conversation ID
   const [isLoading, setIsLoading] = useState(false);
   const [abortController, setAbortController] = useState(null); // Controller để cancel request
+  const [routePlannerVisible, setRoutePlannerVisible] = useState(false);
 
   const quickSuggestions = [
     { id: 1, emoji: '🍜', text: 'Gợi ý quán phở', query: 'Quán phở tốt nhất' },
@@ -141,6 +145,15 @@ export default function ChatBotScreen() {
     setConversationId(null);
   };
 
+  // Handler khi route được tạo thành công
+  const handleRouteCreated = (routeData) => {
+    console.log('📍 Navigating to Map tab with route plan');
+    console.log('Route data:', JSON.stringify(routeData, null, 2));
+    
+    // Navigate to Map tab (direct screen, not nested)
+    navigation.navigate('Map', { routePlan: routeData });
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -148,12 +161,20 @@ export default function ChatBotScreen() {
           <Text style={styles.headerTitle}>🤖🧠🇦🇮👾 Food App AI</Text>
           <Text style={styles.headerSubtitle}>Trợ lý ẩm thực của bạn</Text>
         </View>
-        <TouchableOpacity
-          style={styles.clearButton}
-          onPress={handleClearHistory}
-        >
-          <Ionicons name="trash-outline" size={22} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.routePlannerButton}
+            onPress={() => setRoutePlannerVisible(true)}
+          >
+            <Ionicons name="add-circle" size={28} color="#FF6347" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={handleClearHistory}
+          >
+            <Ionicons name="trash-outline" size={22} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -209,6 +230,13 @@ export default function ChatBotScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Route Planner Modal */}
+      <RoutePlannerModal
+        visible={routePlannerVisible}
+        onClose={() => setRoutePlannerVisible(false)}
+        onRouteCreated={handleRouteCreated}
+      />
     </SafeAreaView>
   );
 }
@@ -240,6 +268,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#ffcccc',
     marginTop: 4,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  routePlannerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   clearButton: {
     width: 40,
