@@ -57,8 +57,10 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
 
     if (status === 401) {
-      await AsyncStorage.removeItem('authToken');
-      Alert.alert("Phiên hết hạn", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      // TODO: Backend có bug validate token. Tạm thời comment out để tránh xóa token khi gặp 401 sai
+      // await AsyncStorage.removeItem('authToken');
+      // Alert.alert("Phiên hết hạn", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      console.warn('⚠️ Got 401 but keeping token (backend validation bug)');
     }
 
     if (!error.response) {
@@ -78,11 +80,11 @@ apiClient.interceptors.response.use(
 );
 
 const getUserId = async () => {
-    try {
-        const jsonValue = await AsyncStorage.getItem('user_data');
-        const user = jsonValue != null ? JSON.parse(jsonValue) : null;
-        return user?.uid || null;
-    } catch (e) { return null; }
+  try {
+    const jsonValue = await AsyncStorage.getItem('user_data');
+    const user = jsonValue != null ? JSON.parse(jsonValue) : null;
+    return user?.uid || null;
+  } catch (e) { return null; }
 };
 
 // ============ AUTHENTICATION ENDPOINTS ============
@@ -94,13 +96,13 @@ export const authAPI = {
         password,
         name,
       });
-      
+
       // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.token || response.data?.idToken;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Register error:', error);
@@ -114,13 +116,13 @@ export const authAPI = {
         email,
         password,
       });
-      
+
       // Lưu token - backend có thể trả token, idToken, hoặc không trả
       const token = response.data?.idToken || response.data?.token;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
         console.log("✅ Token saved to AsyncStorage");
-        
+
         // Verify token was saved
         const savedToken = await AsyncStorage.getItem('authToken');
         if (savedToken) {
@@ -169,16 +171,16 @@ export const authAPI = {
       const response = await apiClient.post('/google-login', {
         idToken,
       });
-      
+
       const token = response.data?.user?.uid;
       if (token) {
         await AsyncStorage.setItem('authToken', token);
       }
-      
+
       if (response.data?.user) {
         await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
       }
-      
+
       return response.data;
     } catch (error) {
       console.error('Google login error:', error);
@@ -285,18 +287,17 @@ export const restaurantAPI = {
     }
   },
 
-  // GET /api/restaurants/search?q=<query> - Tìm kiếm đơn giản
-  searchSimple: async (query) => {
+  // POST /api/search - Tìm kiếm nâng cao với filters (⭐️ SỬA: Thêm method này)
+  search: async (filters) => {
     try {
-      const response = await apiClient.get('/restaurants/search', {
-        params: { q: query },
-      });
-      return response.data.restaurants || [];
+      const response = await apiClient.post('/search', filters);
+      return response.data.places || [];
     } catch (error) {
       console.error('Search restaurants error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
+
 
   // GET /api/restaurants/<id> - Lấy chi tiết nhà hàng (bao gồm menu)
   getById: async (id) => {
@@ -452,7 +453,7 @@ export const favoriteAPI = {
   toggleRestaurantFavorite: async (restaurant_id) => {
     try {
       const response = await apiClient.post('/favorite/toggle-restaurant', {
-        restaurant_id: String(restaurant_id), 
+        restaurant_id: String(restaurant_id),
       });
       return response.data;
     } catch (error) {
@@ -460,7 +461,7 @@ export const favoriteAPI = {
       throw error.response?.data || { error: error.message };
     }
   },
-    
+
   // GET /api/favorite/view (Authentication required)
   getAll: async () => {
     try {
@@ -495,7 +496,8 @@ export const reviewAPI = {
   getByRestaurant: async (restaurantId) => {
     try {
       const response = await apiClient.get(`/reviews/restaurant/${restaurantId}`);
-      return response.data.reviews || [];
+      // DÒNG NÀY ĐÃ ĐƯỢC CHỈNH SỬA: Trả về toàn bộ data để lấy current_rating
+      return response.data; 
     } catch (error) {
       console.error('Get restaurant reviews error:', error);
       throw error.response?.data || { error: error.message };
@@ -512,6 +514,17 @@ export const reviewAPI = {
       throw error.response?.data || { error: error.message };
     }
   },
+  
+  // DELETE /api/reviews/<review_id>
+  delete: async (reviewId) => {
+    try {
+      const response = await apiClient.delete(`/reviews/${reviewId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete review error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  }
 };
 
 // ============ CATEGORIES ENDPOINTS ============
@@ -578,17 +591,17 @@ export const chatbotAPI = {
         message: message,
         conversation_id: conversationId, // Giữ conversation để có context
       });
-      
+
       // Backend trả về: { conversation_id, user_message, bot_response, timestamp }
       return response.data;
     } catch (error) {
       console.error('Send chatbot message error:', error);
-      
+
       // Xử lý lỗi cụ thể
       if (error.response?.status === 500 && error.response?.data?.error?.includes('API key')) {
         throw { error: '⚠️ Backend chatbot chưa cấu hình OpenAI API key. Vui lòng kiểm tra file .env' };
       }
-      
+
       throw error.response?.data || { error: error.message };
     }
   },
@@ -643,6 +656,31 @@ export const chatbotAPI = {
       return response.data;
     } catch (error) {
       console.error('Chatbot search error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // GET /api/chatbot/favorites-for-route - Lấy danh sách yêu thích cho route planner
+  getFavoritesForRoute: async () => {
+    try {
+      const response = await apiClient.get('/chatbot/favorites-for-route');
+      return response.data;
+    } catch (error) {
+      console.error('Get favorites for route error:', error);
+      throw error.response?.data || { error: error.message };
+    }
+  },
+
+  // POST /api/chatbot/create-route - Tạo lộ trình từ các quán đã chọn
+  createRoute: async (restaurantIds, userLocation = null) => {
+    try {
+      const response = await apiClient.post('/chatbot/create-route', {
+        restaurant_ids: restaurantIds,
+        user_location: userLocation,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Create route error:', error);
       throw error.response?.data || { error: error.message };
     }
   },
