@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import BannerCarousel from "../components/BannerCarousel";
 import * as Location from "expo-location";
+import restaurants from "../data/restaurants.json";
+
 // ⭐️ SỬA IMPORT ⭐️
 import { restaurantAPI } from "../services/flaskApi"; // ⬅️ THÊM IMPORT NÀY
 // XÓA: import { searchNearbyPlaces } from "../services/tomtomApi"; 
@@ -131,6 +133,22 @@ export default function HomeScreen({ navigation, route }) {
     { name: "Ăn nhẹ", icon: require("../assets/pizza.png") },
     { name: "xem thêm..." },
   ];
+  const findImageFromRestaurants = (place) => {
+    if (!place?.name) return null;
+
+    const placeName = place.name.toLowerCase();
+
+    const found = restaurants.find(r => {
+      const rName = r.name.toLowerCase();
+      return (
+        rName.includes(placeName) ||
+        placeName.includes(rName)
+      );
+    });
+
+    return found?.image_url || null;
+  };
+
 
   const MAX_NEARBY = 10; // Số lượng mặc định hiển thị trong danh sách "Gần bạn"
   const shownPlaces = places;
@@ -411,7 +429,16 @@ export default function HomeScreen({ navigation, route }) {
                 shownPlaces={shownPlaces}       // Danh sách quán ăn xung quanh
                 mapRef={mapRef}
                 searchMode={searchMode}
-                onMarkerPress={(p) => navigation.navigate("RestaurantDetail", { item: p })}
+                onMarkerPress={(p) => {
+                  const image_url = findImageFromRestaurants(p);
+
+                  navigation.navigate("RestaurantDetail", {
+                    item: {
+                      ...p,
+                      image_url,
+                    },
+                  });
+                }}
                 // Truyền thêm 2 props này để hiển thị tiêu đề marker đúng
                 selectedProvinceId={selectedProvinceId}
                 selectedProvinceName={selectedProvinceName}
