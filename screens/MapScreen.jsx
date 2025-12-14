@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
 
   searchHereButton: {
     position: 'absolute',
-    top: 120,
+    bottom: 160,
     alignSelf: 'center',
     backgroundColor: '#2196F3',
     paddingHorizontal: 20,
@@ -778,7 +778,7 @@ const styles = StyleSheet.create({
 
   resetLocationButton: {
     position: 'absolute',
-    top: 170,
+    bottom: 100,
     alignSelf: 'center',
     backgroundColor: '#FF9500',
     paddingHorizontal: 16,
