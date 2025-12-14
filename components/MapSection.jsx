@@ -55,6 +55,11 @@ export default function MapSection({
           }}
           showsUserLocation={true}
           showsMyLocationButton={true}
+          showsCompass={false}
+          showsScale={false}
+          showsBuildings={false}
+          showsTraffic={false}
+          showsPointsOfInterest={false}
         >
 
           {/* =====================================

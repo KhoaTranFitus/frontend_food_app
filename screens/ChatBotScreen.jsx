@@ -73,7 +73,7 @@ export default function ChatBotScreen() {
     { id: 1, emoji: '🍜', text: 'Gợi ý quán phở', query: 'Quán phở tốt nhất' },
     { id: 2, emoji: '🍕', text: 'Pizza ngon ở đâu', query: 'Quán pizza rẻ nhất' },
     { id: 3, emoji: '🍣', text: 'Nhà hàng sushi', query: 'Quán sushi đắt nhất' },
-    { id: 4, emoji: '🍚', text: 'Quán cơm gần Hcmus', query: 'Quán cơm ngon nhất' },
+    { id: 4, emoji: '🍚', text: 'Quán cơm gần Hcmus', query: 'Quán cơm ngon nhất gần HCMUS' },
   ];
 
   // Dừng tìm kiếm
@@ -83,7 +83,7 @@ export default function ChatBotScreen() {
       setAbortController(null);
     }
     setIsLoading(false);
-    
+
     // Xóa loading message
     setMessages(prev => {
       const withoutLoading = prev.filter(msg => !msg.isLoading);
@@ -126,12 +126,12 @@ export default function ChatBotScreen() {
     try {
       // Gọi API với conversation_id để giữ context
       const response = await chatbotAPI.sendMessage(query, conversationId);
-      
+
       // Lưu conversation_id từ lần đầu
       if (!conversationId && response.conversation_id) {
         setConversationId(response.conversation_id);
       }
-      
+
       // Xóa loading message và thêm response thực tế
       setMessages(prev => {
         const withoutLoading = prev.filter(msg => !msg.isLoading);
@@ -145,7 +145,7 @@ export default function ChatBotScreen() {
       });
     } catch (error) {
       console.error('Chatbot error:', error);
-      
+
       // Xóa loading message và hiển thị lỗi (trừ khi bị abort)
       if (error.name !== 'AbortError' && error.name !== 'CanceledError') {
         setMessages(prev => {
@@ -205,7 +205,7 @@ export default function ChatBotScreen() {
   const handleRouteCreated = (routeData) => {
     console.log('📍 Navigating to Map tab with route plan');
     console.log('Route data:', JSON.stringify(routeData, null, 2));
-    
+
     // Navigate to Map tab (direct screen, not nested)
     navigation.navigate('Map', { routePlan: routeData });
   };

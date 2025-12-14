@@ -30,7 +30,8 @@ export const getUserLocation = async () => {
 // -----------------------------
 // ⭐️ UPDATED: Tọa độ trung tâm các tỉnh (match với id mới - không dấu, không khoảng trắng) ⭐️
 export const PROVINCE_COORDS = {
-  'Ho Chi Minh': { latitude: 10.772357, longitude: 106.697882 },
+  // 'Ho Chi Minh': { latitude: 10.772357, longitude: 106.697882 }, // cho Bến Thành
+  'Ho Chi Minh': { latitude: 10.762719, longitude: 106.682552 }, // KHTN 10.762719, 106.682552
   'Ha Noi': { latitude: 21.036810, longitude: 105.834709 },
   'Da Nang': { latitude: 16.061242, longitude: 108.224176 },
   'Lam Dong': { latitude: 11.938080, longitude: 108.444818 },
@@ -179,6 +180,3 @@ export const searchRestaurants = async ({ query, provinceId, provinceName = 'G�
     return [];
   }
 };
-
-export const searchByProvince = (provinceId) => searchRestaurants({ query: "", provinceId });
-export const searchByQuery = ({ query, provinceId, userLoc }) => searchRestaurants({ query, provinceId, userLoc });

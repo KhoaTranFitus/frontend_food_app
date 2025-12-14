@@ -136,21 +136,6 @@ export default function HomeScreen({ navigation, route }) {
   const shownPlaces = places;
   const displayedNearby = Array.isArray(places) ? places.slice(0, MAX_NEARBY) : [];
 
-  // XÓA: handleFilterSelect cũ vì không còn dùng searchByProvince
-  // const handleFilterSelect = async (provinceId) => {
-  //   setDropdownVisible(false);
-  //   setLoading(true);
-  //   try {
-  //     const normalized = await searchByProvince(provinceId);
-  //     setPlaces(normalized);
-  //   } catch (err) {
-  //     console.warn('Filter search error', err);
-  //     setPlaces([]);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
   // ⭐️ THAY THẾ LOGIC TẢI DỮ LIỆU BAN ĐẦU ⭐️
   // ⭐️ MODIFIED: Centralized location and search logic + Map animation ⭐️
   const handleFilterSelect = async (provinceId) => {
@@ -373,22 +358,6 @@ export default function HomeScreen({ navigation, route }) {
             <RefreshControl
               refreshing={loading}
               onRefresh={handleRefresh} // ⭐️ SỬ DỤNG HÀM REFRESH MỚI ⭐️
-              //               onRefresh={async () => {
-              //                 setLoading(true);
-              //                 const mode = query?.trim() ? "full" : "nearby";
-              //                 setSearchMode(mode);
-              //                 // Use current selected province ID and userLoc for refresh
-              //                 const data = await searchRestaurants({
-              //                   query: query || "",
-              //                   provinceId: selectedProvinceId,
-              //                   provinceName: selectedProvinceName,
-              //                   userLoc: userLoc,
-              //                   radius: mode === "nearby" ? 2000 : null,
-              //                 });
-              //                 setPlaces(data);
-              //                 setLoading(false);
-              //               }}
-
               colors={["#ff6347"]}
             />
           }>
@@ -450,4 +419,3 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, color: "#ffffffff", fontWeight: "700" },
   seeAll: { fontSize: 14, color: "#ff6347" },
 });
-

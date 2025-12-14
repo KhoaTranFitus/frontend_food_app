@@ -6,7 +6,7 @@ import { Alert } from 'react-native'; // Cần import Alert để xử lý lỗi
 
 // ============ CONFIG ============
 // Auto-detect URL từ environment variable hoặc dùng default
-const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.0.101:5000/api'; 
+const DEV_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://192.168.0.101:5000/api';
 
 const PROD_BASE_URL = 'https://your-production-server.com/api';
 
@@ -310,17 +310,6 @@ export const restaurantAPI = {
     }
   },
 
-  // POST /api/search - Tìm kiếm nâng cao với filters
-  searchAdvanced: async (filters) => {
-    try {
-      const response = await apiClient.post('/search', filters);
-      return response.data.places || [];
-    } catch (error) {
-      console.error('Advanced search error:', error);
-      throw error.response?.data || { error: error.message };
-    }
-  },
-
   // POST /api/restaurants/details-by-ids - Lấy nhiều nhà hàng theo IDs
   getDetailsByIds: async (ids) => {
     try {
@@ -368,19 +357,6 @@ export const restaurantAPI = {
     } catch (error) {
       console.error('Get directions error:', error);
       throw error.response?.data || { error: error.message };
-    }
-  },
-
-  // Alias cho tiện dụng - dùng cho home screen
-  getAllRestaurants: async (query = '') => {
-    try {
-      if (query) {
-        return await restaurantAPI.searchSimple(query);
-      }
-      return await restaurantAPI.getAll();
-    } catch (error) {
-      console.error('Get all restaurants alias error:', error);
-      throw error;
     }
   },
 };
@@ -497,7 +473,7 @@ export const reviewAPI = {
     try {
       const response = await apiClient.get(`/reviews/restaurant/${restaurantId}`);
       // DÒNG NÀY ĐÃ ĐƯỢC CHỈNH SỬA: Trả về toàn bộ data để lấy current_rating
-      return response.data; 
+      return response.data;
     } catch (error) {
       console.error('Get restaurant reviews error:', error);
       throw error.response?.data || { error: error.message };
@@ -514,7 +490,7 @@ export const reviewAPI = {
       throw error.response?.data || { error: error.message };
     }
   },
-  
+
   // DELETE /api/reviews/<review_id>
   delete: async (reviewId) => {
     try {
