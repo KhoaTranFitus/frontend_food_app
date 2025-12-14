@@ -80,7 +80,7 @@ export default function ProfileScreen() {
                         style={styles.editButton}
                         onPress={() => navigation.navigate("EditProfile")}>
                         <Ionicons name="pencil" size={16} color="black" />
-                        <Text style={styles.editButtonText}> Edit profile</Text>
+                        <Text style={styles.editButtonText}> Chỉnh sửa hồ sơ</Text>
                     </TouchableOpacity>
                 </View>
 
