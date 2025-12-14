@@ -14,6 +14,9 @@ import MapView, { Marker, Polyline, Callout } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import axios from 'axios';
 import * as Location from 'expo-location';
+import restaurantImages from '../data/restaurants.json';
+
+
 
 const BACKEND_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -30,7 +33,6 @@ export default function MapScreen({ navigation, route }) {
   const [userLocation, setUserLocation] = useState(null);
   const [destination, setDestination] = useState(null);
   const [routeCoords, setRouteCoords] = useState([]);
-
   const [mapRegion, setMapRegion] = useState(null);
   const [showSearchHereButton, setShowSearchHereButton] = useState(false);
   const [searchCenter, setSearchCenter] = useState(null);
@@ -56,6 +58,7 @@ export default function MapScreen({ navigation, route }) {
   const [filterTags] = useState([]);
   const [filterLimit] = useState(100);
 
+  
   // ===== UI STATE =====
   const screenWidth = Dimensions.get('window').width;
   const panelWidth = Math.round(screenWidth / 2);
@@ -76,6 +79,21 @@ export default function MapScreen({ navigation, route }) {
   const hamburgerTop = searchTop + searchHeight + 6;
 
   const mapRef = useRef(null);
+  const findImageFromRestaurants = (place) => {
+    if (!place?.name) return null;
+
+    const placeName = place.name.toLowerCase();
+
+    const found = restaurantImages.find(r => {
+      const rName = r.name.toLowerCase();
+      return (
+        rName.includes(placeName) ||
+        placeName.includes(rName)
+      );
+    });
+
+    return found?.image_url || null;
+  };
 
   // ===== BACKEND API: FETCH FILTERED LOCATIONS =====
   const fetchFilteredLocations = async (customCenter = null) => {
@@ -423,16 +441,12 @@ export default function MapScreen({ navigation, route }) {
   };
 
   const handleRestaurantPress = (place) => {
+    const image_url = findImageFromRestaurants(place);
+
     const item = {
-      id: place.id,
-      name: place.name,
-      address: place.address,
-      position: place.position,
-      dishType: place.dishType,
-      rating: place.rating || 4.5,
-      category: place.category || 'Restaurant',
-      image: require('../assets/amthuc.jpg'),
-    };
+      ...place,
+      image_url, 
+      };
 
     navigation.navigate('HomeStack', {
       screen: 'RestaurantDetail',
