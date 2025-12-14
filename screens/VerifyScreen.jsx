@@ -38,7 +38,10 @@ export default function VerifyScreen() {
         ]);
       } else if (mode === "reset_password") {
         // Sau khi verify reset password -> ChangePassword
-        navigation.navigate("ChangePassword", { email });
+          navigation.navigate("ChangePassword", {
+              email: email,
+              code: code
+          });
       }
     } catch (error) {
       Alert.alert("Lỗi", error.error || "OTP không đúng hoặc hết hạn");

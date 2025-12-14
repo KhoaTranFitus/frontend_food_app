@@ -71,6 +71,37 @@ export default function LoginScreen() {
         }
     };
 
+    const handleForgotPassword = async () => {
+        if (!email) {
+            setErrorMessage("Vui lòng nhập email để lấy lại mật khẩu.");
+            return;
+        }
+
+        setLoading(true); // Tận dụng state loading để xoay vòng tròn
+        setErrorMessage(""); // Xóa lỗi cũ
+
+        try {
+            // 1. Gọi API gửi mail
+            console.log("Đang gửi yêu cầu quên mật khẩu cho:", email);
+            await authAPI.forgotPassword(email);
+
+            // 2. Nếu thành công -> Chuyển sang màn hình Verify
+            // Alert cho người dùng biết để check mail
+            alert("Mã xác thực đã được gửi tới email của bạn!");
+
+            navigation.navigate("Verify", {
+                mode: "reset_password", // Chế độ này bên VerifyScreen sẽ hiện ô nhập Code + Pass mới
+                email: email,
+            });
+
+        } catch (error) {
+            console.error("Lỗi quên mật khẩu:", error);
+            setErrorMessage(error.error || "Không thể gửi mã xác thực. Vui lòng thử lại.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <SafeAreaView style={{ flex: 1 }}>
             <ImageBackground
@@ -113,20 +144,10 @@ export default function LoginScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity
-                        onPress={() => {
-                            if (!email) {
-                                setErrorMessage("Vui lòng nhập email để reset password");
-                                return;
-                            }
-                            setErrorMessage("");
-                            navigation.navigate("Verify", {
-                                mode: "reset_password",
-                                email: email,
-                            });
-                        }}
-                    >
-                        <Text style={styles.forgot}>Forgot password?</Text>
+                    <TouchableOpacity onPress={handleForgotPassword} disabled={loading}>
+                        <Text style={styles.forgot}>
+                            {loading ? "Sending..." : "Forgot password?"}
+                        </Text>
                     </TouchableOpacity>
 
                     {/* 3. Hiển thị thông báo lỗi tại đây */}
